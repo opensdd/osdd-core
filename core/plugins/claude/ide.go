@@ -12,7 +12,7 @@ import (
 	"github.com/opensdd/osdd-core/core/providers"
 )
 
-func NewIDEProvider() providers.IDEProvider {
+func NewIDEProvider() providers.IDE {
 	return &shared.IDE{
 		CommandsFolder:     ".claude/commands",
 		MCPServersJSONPath: ".mcp.json",

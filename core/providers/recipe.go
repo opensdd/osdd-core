@@ -12,7 +12,7 @@ import (
 )
 
 type Recipe struct {
-	IDE IDEProvider
+	IDE IDE
 }
 
 func (r *Recipe) Materialize(ctx context.Context, recipe *recipes.Recipe) (*osdd.MaterializedResult, error) {

@@ -9,7 +9,7 @@ import (
 	"github.com/opensdd/osdd-core/core/providers"
 )
 
-func getIDE(ideType string) (providers.IDEProvider, error) {
+func getIDE(ideType string) (providers.IDE, error) {
 	switch strings.ToLower(ideType) {
 	case "claude":
 		return claude.NewIDEProvider(), nil

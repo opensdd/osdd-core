@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func getIDE() providers.IDEProvider {
+func getIDE() providers.IDE {
 	return &shared.IDE{
 		CommandsFolder:     ".claude/commands",
 		MCPServersJSONPath: ".mcp.json",

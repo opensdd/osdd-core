@@ -1,2 +1,1 @@
-# osdd-core
-Core toolong for OpenSDD
+# Core libraries supporting OpenSDD

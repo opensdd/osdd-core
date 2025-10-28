@@ -1,0 +1,109 @@
+{
+  "context" : {
+    "items": [
+      {
+        "path": "CONTRIBUTING.MD",
+        "from": {
+          "github": {
+            "path": "https://github.com/myorg/standards/CONTRIBUTING.MD"
+          }
+        }
+      },
+      {
+        "path": "devplan/plans/dev-115/prd.md",
+        "from": {
+          "cmd": "devplan fetch cmehhhdlmsdflnbnlkm12 -c 10"
+        }
+      },
+      {
+        "path": "devplan/plans/dev-115/tech_brief.md",
+        "from": {
+          "cmd": "devplan fetch cmehhhdlmsdflnbnlkm13 -c 10"
+        }
+      },
+      {
+        "path": "devplan/plans/dev-115/dev-117/requirements.md",
+        "from": {
+          "cmd": "devplan fetch cmehhhdlmsdflnbnlkm14 -c 10"
+        }
+      },
+      {
+        "path": "devplan/plans/dev-115/dev-117/story_context.md",
+        "from": {
+          "cmd": "devplan fetch cmehhhdlmsdflnbnlkm15 -c 10"
+        }
+      },
+      {
+        "path": "devplan/plans/dev-115/dev-117/dev-118/requirements.md",
+        "from": {
+          "combined": {
+            "items": [
+              { "text": "# Overview: " },
+              {
+                "cmd": "devplan fetch cmehhhdlmsdflnbnlkm16 -c 10" // overview
+              },
+              { "text": "# Detailed guidelines: " },
+              {
+                "cmd": "devplan fetch cmehhhdlmsdflnbnlkm17 -c 10" // prompt
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "ide": {
+    "commands": {
+      "items": [
+        {
+          "name": "refine",
+          "from": {
+            "cmd": "devplan fetch-command refine -c 10"
+          }
+        },
+        {
+          "name": "pr",
+          "from": {
+            "github": {
+              "path": "https://github.com/opensdd/osdd-api/standard/commands/pr.md",
+              "version": {
+                "release": "v1.2.3" // can be release, tag, commit or omitted.
+              }
+            }
+          }
+        }
+      ]
+    },
+    "mcpServers": {
+      "servers": {
+        "github": {
+          "http": {
+            "url": "https://api.githubcopilot.com/mcp/"
+          }
+        }
+      },
+      "devplan": {
+        "stdio": {
+          "command": "devplan mcp",
+        }
+      }
+    },
+    "permissions": {
+      "allowCommands": [
+        { "bash": "npm run lint" },
+        { "bash": "curl:*" },
+        { "read": "~/.zshrc" }
+      ],
+      "denyCommands": [
+        { "bash": "rm:*" },
+        { "read": "./.env.*" },
+        { "read": "**/secrets/**" }
+      ]
+    },
+    "env": {
+      "vars": {
+        "CLAUDE_CODE_ENABLE_TELEMETRY": "1"
+      }
+    }
+  }
+}

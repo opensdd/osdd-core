@@ -8,7 +8,7 @@ import (
 	"github.com/opensdd/osdd-api/clients/go/osdd"
 	"github.com/opensdd/osdd-api/clients/go/osdd/recipes"
 	"github.com/opensdd/osdd-core/core"
-	utils2 "github.com/opensdd/osdd-core/core/utils"
+	"github.com/opensdd/osdd-core/core/utils"
 )
 
 type Context struct{}
@@ -71,10 +71,10 @@ func (c *Context) fetchContent(ctx context.Context, from *recipes.ContextFrom, g
 		return from.GetText(), nil
 
 	case recipes.ContextFrom_Cmd_case:
-		return utils2.ExecuteCommand(ctx, from.GetCmd())
+		return utils.ExecuteCommand(ctx, from.GetCmd())
 
 	case recipes.ContextFrom_Github_case:
-		return utils2.FetchGithub(ctx, from.GetGithub())
+		return utils.FetchGithub(ctx, from.GetGithub())
 
 	case recipes.ContextFrom_Combined_case:
 		return c.fetchCombined(ctx, from.GetCombined(), genCtx)
@@ -85,6 +85,9 @@ func (c *Context) fetchContent(ctx context.Context, from *recipes.ContextFrom, g
 			return "", fmt.Errorf("prefetch id [%v] not found", from.GetPrefetchId())
 		}
 		return data.GetData(), nil
+
+	case recipes.ContextFrom_UserInput_case:
+		return renderUserInput(from.GetUserInput(), genCtx)
 
 	default:
 		return "", fmt.Errorf("unknown or unset context source type")
@@ -123,10 +126,10 @@ func (c *Context) fetchCombinedItem(ctx context.Context, item *recipes.CombinedC
 		return item.GetText(), nil
 
 	case recipes.CombinedContextSource_Item_Cmd_case:
-		return utils2.ExecuteCommand(ctx, item.GetCmd())
+		return utils.ExecuteCommand(ctx, item.GetCmd())
 
 	case recipes.CombinedContextSource_Item_Github_case:
-		return utils2.FetchGithub(ctx, item.GetGithub())
+		return utils.FetchGithub(ctx, item.GetGithub())
 
 	case recipes.CombinedContextSource_Item_PrefetchId_case:
 		data, ok := genCtx.GetPrefetched()[item.GetPrefetchId()]
@@ -134,6 +137,9 @@ func (c *Context) fetchCombinedItem(ctx context.Context, item *recipes.CombinedC
 			return "", fmt.Errorf("prefetch id [%v] not found", item.GetPrefetchId())
 		}
 		return data.GetData(), nil
+
+	case recipes.CombinedContextSource_Item_UserInput_case:
+		return renderUserInput(item.GetUserInput(), genCtx)
 
 	default:
 		return "", fmt.Errorf("unknown or unset combined item type")

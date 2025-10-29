@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/opensdd/osdd-api/clients/go/osdd"
@@ -54,6 +55,22 @@ func combinedCmdItem(cmd string) *recipes.CombinedContextSource_Item {
 func combinedGithubItem(path string) *recipes.CombinedContextSource_Item {
 	return recipes.CombinedContextSource_Item_builder{
 		Github: osdd.GitReference_builder{Path: path}.Build(),
+	}.Build()
+}
+
+func userInputParam(name string, optional bool) *osdd.UserInputParameter {
+	return osdd.UserInputParameter_builder{Name: name, Optional: optional}.Build()
+}
+
+func userInputFromParams(params ...*osdd.UserInputParameter) *recipes.ContextFrom {
+	return recipes.ContextFrom_builder{
+		UserInput: recipes.UserInputContextSource_builder{Entries: params}.Build(),
+	}.Build()
+}
+
+func combinedUserInputItem(params ...*osdd.UserInputParameter) *recipes.CombinedContextSource_Item {
+	return recipes.CombinedContextSource_Item_builder{
+		UserInput: recipes.UserInputContextSource_builder{Entries: params}.Build(),
 	}.Build()
 }
 
@@ -414,4 +431,122 @@ func ExampleContext_Materialize() {
 		}
 	}
 	// Output: Path: example.txt, Content Length: 23
+}
+
+// --- New tests for UserInput materialization ---
+func TestContext_FetchContent_UserInput_Success(t *testing.T) {
+	c := &Context{}
+	from := userInputFromParams(
+		userInputParam("A", false),
+		userInputParam("B", true),
+		userInputParam("C", false),
+	)
+	genCtx := &core.GenerationContext{UserInput: map[string]string{
+		"A": "first",
+		"C": "third",
+	}}
+
+	content, err := c.fetchContent(context.Background(), from, genCtx)
+	require.NoError(t, err)
+	// Validate markdown structure and values
+	assert.Contains(t, content, "# User Input")
+	// Ensure sections for A, B, C exist and values are placed correctly
+	assert.Contains(t, content, "## A")
+	assert.Contains(t, content, "**Value**: first")
+	assert.Contains(t, content, "## B")
+	assert.Contains(t, content, "**Value**: ") // optional missing -> empty value
+	assert.Contains(t, content, "## C")
+	assert.Contains(t, content, "**Value**: third")
+	// Ensure ordering A before C
+	assert.Less(t, strings.Index(content, "## A"), strings.Index(content, "## C"))
+}
+
+func TestContext_FetchContent_UserInput_MissingRequired(t *testing.T) {
+	c := &Context{}
+	from := userInputFromParams(
+		userInputParam("A", false),
+		userInputParam("B", false),
+	)
+	genCtx := &core.GenerationContext{UserInput: map[string]string{
+		"A": "value-a",
+	}}
+
+	_, err := c.fetchContent(context.Background(), from, genCtx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing required user input parameters")
+	assert.Contains(t, err.Error(), "B")
+}
+
+func TestContext_FetchCombined_UserInput_Mixed(t *testing.T) {
+	c := &Context{}
+	combined := recipes.CombinedContextSource_builder{
+		Items: []*recipes.CombinedContextSource_Item{
+			combinedTextItem("prefix-"),
+			combinedUserInputItem(userInputParam("X", false)),
+			combinedTextItem("-suffix"),
+		},
+	}.Build()
+
+	genCtx := &core.GenerationContext{UserInput: map[string]string{
+		"X": "middle",
+	}}
+
+	content, err := c.fetchCombined(context.Background(), combined, genCtx)
+	require.NoError(t, err)
+	// Should include our prefix, the markdown header and value, and the suffix
+	assert.Contains(t, content, "prefix-")
+	assert.Contains(t, content, "# User Input")
+	assert.Contains(t, content, "## X")
+	assert.Contains(t, content, "**Value**: middle")
+	assert.Contains(t, content, "-suffix")
+}
+
+func TestContext_Materialize_UserInput_MissingRequired(t *testing.T) {
+	c := &Context{}
+
+	ctx := recipes.Context_builder{
+		Entries: []*recipes.ContextEntry{
+			recipes.ContextEntry_builder{
+				Path: "out.txt",
+				From: userInputFromParams(
+					userInputParam("REQ", false),
+				),
+			}.Build(),
+		},
+	}.Build()
+
+	_, err := c.Materialize(context.Background(), ctx, &core.GenerationContext{UserInput: map[string]string{}})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to materialize entry for path out.txt")
+	assert.Contains(t, err.Error(), "missing required user input parameters")
+	assert.Contains(t, err.Error(), "REQ")
+}
+
+func TestContext_Materialize_Combined_UserInput_MissingRequired(t *testing.T) {
+	c := &Context{}
+
+	from := recipes.ContextFrom_builder{
+		Combined: recipes.CombinedContextSource_builder{
+			Items: []*recipes.CombinedContextSource_Item{
+				combinedTextItem("prefix-"),
+				combinedUserInputItem(userInputParam("REQ2", false)),
+			},
+		}.Build(),
+	}.Build()
+
+	ctx := recipes.Context_builder{
+		Entries: []*recipes.ContextEntry{
+			recipes.ContextEntry_builder{
+				Path: "combined.txt",
+				From: from,
+			}.Build(),
+		},
+	}.Build()
+
+	_, err := c.Materialize(context.Background(), ctx, &core.GenerationContext{UserInput: map[string]string{}})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to materialize entry for path combined.txt")
+	assert.Contains(t, err.Error(), "failed to fetch combined item")
+	assert.Contains(t, err.Error(), "missing required user input parameters")
+	assert.Contains(t, err.Error(), "REQ2")
 }

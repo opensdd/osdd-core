@@ -8,6 +8,25 @@
             "path": "https://github.com/opensdd/recipes/global/agents_md/resources/goal.md"
           }
         }
+      },
+      {
+        "path": "specs/parameters.md",
+        "from": {
+          "userInput": {
+            "entries": [
+              {
+                "name": "Repositories to clone",
+                "description": "Comma separated list of repositories to clone",
+                "optional": true
+              },
+              {
+                "name": "Instructions",
+                "description": "Additional instructions for an agent to focus on",
+                "optional": true
+              }
+            ]
+          }
+        }
       }
     ]
   },

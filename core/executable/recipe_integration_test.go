@@ -25,8 +25,7 @@ func TestExecutableRecipe_Materialize_FromJSON_Integration(t *testing.T) {
 
 	// Unmarshal JSON into recipes.Recipe using protojson with unknown fields discarded
 	recipe := &recipes.Recipe{}
-	u := protojson.UnmarshalOptions{DiscardUnknown: true}
-	require.NoError(t, u.Unmarshal(data, recipe), "failed to unmarshal recipe JSON")
+	require.NoError(t, protojson.Unmarshal(data, recipe), "failed to unmarshal recipe JSON")
 
 	// Wrap it into an ExecutableRecipe specifying the IDE type
 	exec := recipes.ExecutableRecipe_builder{
@@ -51,6 +50,7 @@ func TestExecutableRecipe_Materialize_FromJSON_Integration(t *testing.T) {
 	// Expect files from context and IDE commands, plus Claude settings
 	expectedPaths := []string{
 		"specs/goal.md",
+		"specs/parameters.md",
 		".claude/commands/agents_md_plan.md",
 		".claude/commands/agents_md.md",
 		".claude/commands/agents_md_generate.md",
@@ -65,6 +65,9 @@ func TestExecutableRecipe_Materialize_FromJSON_Integration(t *testing.T) {
 		// All files should have some content
 		assert.NotEmpty(t, got[p], "file %s should have non-empty content", p)
 	}
+
+	// parameters.md should be a Markdown with header even without values provided
+	assert.Contains(t, got["specs/parameters.md"], "# User Input")
 
 	// Sanity: we expect at least these entries
 	assert.GreaterOrEqual(t, len(got), len(expectedPaths))

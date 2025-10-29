@@ -2,11 +2,11 @@ ROOT := $(shell git rev-parse --show-toplevel)
 export GOBIN := $(ROOT)/bin
 
 $(GOBIN):
-	@mkdir -p $GOBIN
-	@echo "$GOBIN" created
+	@mkdir -p $(GOBIN)
+	@echo "$(GOBIN)" created
 
 $(GOBIN)/golangci-lint: $(GOBIN)
-	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(GOBIN) v2.5.0
 	@echo "golangci-lint install"
 
 lint: $(GOBIN)/golangci-lint

@@ -13,6 +13,7 @@ import (
 
 func TestPersistMaterializedResult(t *testing.T) {
 	t.Run("basic", func(t *testing.T) {
+		t.Parallel()
 		root := t.TempDir()
 		res := osdd.MaterializedResult_builder{
 			Entries: []*osdd.MaterializedResult_Entry{
@@ -31,6 +32,7 @@ func TestPersistMaterializedResult(t *testing.T) {
 	})
 
 	t.Run("nested_dirs", func(t *testing.T) {
+		t.Parallel()
 		root := t.TempDir()
 		path := filepath.Join("a", "b", "c.txt")
 		res := osdd.MaterializedResult_builder{
@@ -49,6 +51,7 @@ func TestPersistMaterializedResult(t *testing.T) {
 	})
 
 	t.Run("overwrite", func(t *testing.T) {
+		t.Parallel()
 		root := t.TempDir()
 		p := "file.txt"
 		res1 := osdd.MaterializedResult_builder{Entries: []*osdd.MaterializedResult_Entry{

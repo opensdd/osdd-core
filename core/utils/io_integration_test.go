@@ -1,5 +1,3 @@
-//go:build integration
-
 package utils
 
 import (
@@ -11,12 +9,20 @@ import (
 )
 
 func TestExecuteCommand_Integration_Success(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	t.Parallel()
 	out, err := ExecuteCommand(context.Background(), "echo 'integration ok'")
 	require.NoError(t, err)
 	assert.Equal(t, "integration ok\n", out)
 }
 
 func TestExecuteCommand_Integration_Error(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	t.Parallel()
 	_, err := ExecuteCommand(context.Background(), "exit 1")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "command execution failed")

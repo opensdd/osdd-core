@@ -111,6 +111,7 @@ func TestProcessor_Process(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			p := &Processor{}
 			result, err := p.Process(context.Background(), tt.prefetch)
 
@@ -161,6 +162,7 @@ func TestProcessor_ProcessEntry(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			p := &Processor{}
 			data, err := p.processEntry(context.Background(), tt.entry)
 

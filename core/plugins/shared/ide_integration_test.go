@@ -1,5 +1,3 @@
-//go:build integration
-
 package shared
 
 import (
@@ -22,6 +20,9 @@ func getIDEInteg() *IDE {
 }
 
 func TestIDE_Materialize_Mcp_MergeWithExisting(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
 	// Setup: Create a temporary directory and existing MCP file
 	tempDir := t.TempDir()
 	claudeDir := filepath.Join(tempDir, ".claude")
@@ -99,6 +100,10 @@ func TestIDE_Materialize_Mcp_MergeWithExisting(t *testing.T) {
 }
 
 func TestIDE_Materialize_Mcp_InvalidExistingJSON(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	t.Parallel()
 	// Setup: Create a temporary directory with invalid JSON
 	tempDir := t.TempDir()
 	claudeDir := filepath.Join(tempDir, ".claude")

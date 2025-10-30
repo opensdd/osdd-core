@@ -1,5 +1,3 @@
-//go:build integration
-
 package utils
 
 import (
@@ -13,6 +11,10 @@ import (
 )
 
 func TestFetchGithub_Integration_RealGithubFetch(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	t.Parallel()
 	ref := osdd.GitReference_builder{
 		Path: "https://github.com/devplaninc/devplan-cli/blob/main/README.md",
 	}.Build()

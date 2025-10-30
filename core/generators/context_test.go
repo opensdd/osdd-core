@@ -502,6 +502,7 @@ func TestContext_FetchCombined_UserInput_Mixed(t *testing.T) {
 }
 
 func TestContext_Materialize_UserInput_MissingRequired(t *testing.T) {
+	t.Parallel()
 	c := &Context{}
 
 	ctx := recipes.Context_builder{
@@ -523,6 +524,7 @@ func TestContext_Materialize_UserInput_MissingRequired(t *testing.T) {
 }
 
 func TestContext_Materialize_Combined_UserInput_MissingRequired(t *testing.T) {
+	t.Parallel()
 	c := &Context{}
 
 	from := recipes.ContextFrom_builder{

@@ -13,12 +13,10 @@ lint: $(GOBIN)/golangci-lint
 	$(GOBIN)/golangci-lint run
 
 test:
+	go test ./... -short
+
+test-all:
 	go test ./...
-
-test-integration:
-	go test ./... -tags=integration
-
-test-all: test-integration
 
 setup: $(GOBIN)
 	@go mod tidy

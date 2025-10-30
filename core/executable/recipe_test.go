@@ -10,6 +10,7 @@ import (
 )
 
 func TestExecutableRecipe_Materialize_Table(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		ideType     string
@@ -45,6 +46,7 @@ func TestExecutableRecipe_Materialize_Table(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			// Build executable recipe with given entry point ide type and provided recipe
 			exec := tt.execRecipe
 			exec.EntryPoint = recipes.EntryPoint_builder{IdeType: tt.ideType}.Build()

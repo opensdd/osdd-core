@@ -27,12 +27,14 @@ func strPtr(s string) *string {
 }
 
 func TestRecipe_Materialize_NilRecipe(t *testing.T) {
+	t.Parallel()
 	r := &providers.Recipe{IDE: getIDE()}
 	_, err := r.Materialize(context.Background(), nil)
 	assert.Error(t, err, "expected error for nil recipe")
 }
 
 func TestRecipe_Materialize_EmptyRecipe(t *testing.T) {
+	t.Parallel()
 	r := &providers.Recipe{IDE: getIDE()}
 	recipe := recipes.Recipe_builder{}.Build()
 	result, err := r.Materialize(context.Background(), recipe)
@@ -42,6 +44,7 @@ func TestRecipe_Materialize_EmptyRecipe(t *testing.T) {
 }
 
 func TestRecipe_Materialize_ContextOnly(t *testing.T) {
+	t.Parallel()
 	r := &providers.Recipe{IDE: getIDE()}
 
 	recipe := recipes.Recipe_builder{
@@ -68,6 +71,7 @@ func TestRecipe_Materialize_ContextOnly(t *testing.T) {
 }
 
 func TestRecipe_Materialize_IdeOnly(t *testing.T) {
+	t.Parallel()
 	r := &providers.Recipe{IDE: getIDE()}
 
 	recipe := recipes.Recipe_builder{
@@ -98,6 +102,7 @@ func TestRecipe_Materialize_IdeOnly(t *testing.T) {
 }
 
 func TestRecipe_Materialize_ContextAndIde(t *testing.T) {
+	t.Parallel()
 	r := &providers.Recipe{IDE: getIDE()}
 
 	recipe := recipes.Recipe_builder{
@@ -140,6 +145,7 @@ func TestRecipe_Materialize_ContextAndIde(t *testing.T) {
 }
 
 func TestRecipe_Materialize_ComplexRecipe(t *testing.T) {
+	t.Parallel()
 	r := &providers.Recipe{IDE: getIDE()}
 
 	// Mock HTTP server for GitHub content
@@ -247,6 +253,7 @@ func TestRecipe_Materialize_ComplexRecipe(t *testing.T) {
 }
 
 func TestRecipe_Materialize_InvalidContext(t *testing.T) {
+	t.Parallel()
 	r := &providers.Recipe{IDE: getIDE()}
 
 	recipe := recipes.Recipe_builder{
@@ -266,6 +273,7 @@ func TestRecipe_Materialize_InvalidContext(t *testing.T) {
 }
 
 func TestRecipe_Materialize_InvalidIde(t *testing.T) {
+	t.Parallel()
 	r := &providers.Recipe{IDE: getIDE()}
 
 	recipe := recipes.Recipe_builder{
@@ -287,6 +295,7 @@ func TestRecipe_Materialize_InvalidIde(t *testing.T) {
 }
 
 func TestRecipe_Materialize_ContextWithCombinedSource(t *testing.T) {
+	t.Parallel()
 	r := &providers.Recipe{IDE: getIDE()}
 
 	recipe := recipes.Recipe_builder{
@@ -325,6 +334,7 @@ func TestRecipe_Materialize_ContextWithCombinedSource(t *testing.T) {
 }
 
 func TestRecipe_Materialize_MultiplePermissions(t *testing.T) {
+	t.Parallel()
 	r := &providers.Recipe{IDE: getIDE()}
 
 	recipe := recipes.Recipe_builder{
@@ -350,6 +360,7 @@ func TestRecipe_Materialize_MultiplePermissions(t *testing.T) {
 }
 
 func TestRecipe_Materialize_MultipleMcpServers(t *testing.T) {
+	t.Parallel()
 	r := &providers.Recipe{IDE: getIDE()}
 
 	recipe := recipes.Recipe_builder{

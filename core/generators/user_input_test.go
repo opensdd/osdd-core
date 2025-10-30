@@ -22,6 +22,7 @@ func readTestdata(t *testing.T, path string) string {
 }
 
 func TestRenderUserInput_Success(t *testing.T) {
+	t.Parallel()
 	spec := buildUserInputSpec(
 		osdd.UserInputParameter_builder{Name: "Repo", Description: "Repository URL", Optional: false}.Build(),
 		osdd.UserInputParameter_builder{Name: "Branch", Description: "Git branch", Optional: true}.Build(),
@@ -38,6 +39,7 @@ func TestRenderUserInput_Success(t *testing.T) {
 }
 
 func TestRenderUserInput_OptionalMissing_RendersEmptyValue(t *testing.T) {
+	t.Parallel()
 	spec := buildUserInputSpec(
 		osdd.UserInputParameter_builder{Name: "Repo", Description: "Repository URL", Optional: false}.Build(),
 		osdd.UserInputParameter_builder{Name: "Notes", Description: "Optional notes", Optional: true}.Build(),
@@ -53,6 +55,7 @@ func TestRenderUserInput_OptionalMissing_RendersEmptyValue(t *testing.T) {
 }
 
 func TestRenderUserInput_MissingRequired(t *testing.T) {
+	t.Parallel()
 	spec := buildUserInputSpec(
 		osdd.UserInputParameter_builder{Name: "Repo", Optional: false}.Build(),
 	)
@@ -66,6 +69,7 @@ func TestRenderUserInput_MissingRequired(t *testing.T) {
 }
 
 func TestRenderUserInput_EmptySpec(t *testing.T) {
+	t.Parallel()
 	spec := buildUserInputSpec()
 	out, err := renderUserInput(spec, &core.GenerationContext{})
 	require.NoError(t, err)
@@ -73,6 +77,7 @@ func TestRenderUserInput_EmptySpec(t *testing.T) {
 }
 
 func TestRenderUserInput_NilSpec(t *testing.T) {
+	t.Parallel()
 	out, err := renderUserInput(nil, &core.GenerationContext{})
 	assert.Empty(t, out)
 	require.Error(t, err)

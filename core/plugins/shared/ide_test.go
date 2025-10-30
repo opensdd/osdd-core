@@ -18,12 +18,14 @@ func getIDE() *IDE {
 }
 
 func TestIDE_Materialize_NilIde(t *testing.T) {
+	t.Parallel()
 	g := getIDE()
 	_, err := g.Materialize(context.Background(), nil)
 	assert.Error(t, err)
 }
 
 func TestIDE_Materialize_Mcp(t *testing.T) {
+	t.Parallel()
 	g := getIDE()
 
 	ide := recipes.Ide_builder{

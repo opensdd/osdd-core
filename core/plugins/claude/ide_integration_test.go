@@ -1,5 +1,3 @@
-//go:build integration
-
 package claude
 
 import (
@@ -16,6 +14,10 @@ import (
 // Integration Tests for Merge Functionality
 
 func TestIDE_Materialize_Permissions_MergeWithExisting(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	t.Parallel()
 	// Setup: Create a temporary directory and existing settings file
 	tempDir := t.TempDir()
 	claudeDir := filepath.Join(tempDir, ".claude")
@@ -97,6 +99,9 @@ func TestIDE_Materialize_Permissions_MergeWithExisting(t *testing.T) {
 }
 
 func TestIDE_Materialize_McpServers_AutoAddPermissions(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
 	// Setup: Create a temporary directory
 	tempDir := t.TempDir()
 	claudeDir := filepath.Join(tempDir, ".claude")

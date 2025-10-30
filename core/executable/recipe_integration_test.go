@@ -1,5 +1,3 @@
-//go:build integration
-
 package executable_test
 
 import (
@@ -16,6 +14,9 @@ import (
 )
 
 func TestExecutableRecipe_Materialize_FromJSON_Integration(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
 	t.Parallel()
 
 	// Load the sample recipe JSON from testdata

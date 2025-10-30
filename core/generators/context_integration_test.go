@@ -1,5 +1,3 @@
-//go:build integration
-
 package generators
 
 import (
@@ -14,6 +12,10 @@ import (
 )
 
 func TestContext_IntegrationTest_TextSource(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	t.Parallel()
 	c := &Context{}
 
 	ctx := recipes.Context_builder{
@@ -39,6 +41,10 @@ func TestContext_IntegrationTest_TextSource(t *testing.T) {
 }
 
 func TestContext_IntegrationTest_CmdSource(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	t.Parallel()
 	c := &Context{}
 
 	ctx := recipes.Context_builder{
@@ -64,6 +70,10 @@ func TestContext_IntegrationTest_CmdSource(t *testing.T) {
 }
 
 func TestContext_IntegrationTest_MultipleEntries(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	t.Parallel()
 	c := &Context{}
 
 	ctx := recipes.Context_builder{
@@ -103,6 +113,10 @@ func TestContext_IntegrationTest_MultipleEntries(t *testing.T) {
 }
 
 func TestContext_IntegrationTest_FailFast(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	t.Parallel()
 	c := &Context{}
 
 	ctx := recipes.Context_builder{
@@ -127,6 +141,10 @@ func TestContext_IntegrationTest_FailFast(t *testing.T) {
 }
 
 func TestContext_IntegrationTest_RealGithubFetch(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	t.Parallel()
 	c := &Context{}
 
 	ctx := recipes.Context_builder{

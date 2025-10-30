@@ -12,7 +12,7 @@ func TestGitHub_FetchRecipe_Integration_AgentsMD(t *testing.T) {
 		t.Skip()
 	}
 	t.Parallel()
-	g := &GitHub{}
+	g := &GitHub{Strict: true}
 	exec, err := g.FetchRecipe("agents_md")
 	require.NoError(t, err, "unexpected error fetching agents_md recipe from GitHub")
 	require.NotNil(t, exec)

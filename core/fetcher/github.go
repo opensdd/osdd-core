@@ -12,6 +12,7 @@ import (
 )
 
 type GitHub struct {
+	Strict bool
 }
 
 // buildGitHubRecipeURL constructs a GitHub URL for the given recipe id according to the rules:
@@ -59,6 +60,6 @@ func (g *GitHub) FetchRecipe(id string) (*recipes.ExecutableRecipe, error) {
 	}
 
 	exec := &recipes.ExecutableRecipe{}
-	um := protojson.UnmarshalOptions{DiscardUnknown: true}
+	um := protojson.UnmarshalOptions{DiscardUnknown: !g.Strict}
 	return exec, um.Unmarshal([]byte(content), exec)
 }

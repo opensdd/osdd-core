@@ -45,11 +45,7 @@ func (p *Processor) Process(ctx context.Context, prefetch *osdd.Prefetch) (map[s
 func (p *Processor) processEntry(ctx context.Context, entry *osdd.PrefetchEntry) (string, error) {
 	switch entry.WhichType() {
 	case osdd.PrefetchEntry_Cmd_case:
-		cmd := entry.GetCmd()
-		if cmd == "" {
-			return "", fmt.Errorf("cmd cannot be empty")
-		}
-		data, err := utils.ExecuteCommand(ctx, cmd)
+		data, err := utils.ExecuteCommand(ctx, entry.GetCmd())
 		if err != nil {
 			return "", fmt.Errorf("command execution failed: %w", err)
 		}

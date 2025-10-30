@@ -13,6 +13,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func ex(cmd string, args ...string) *osdd.Exec {
+	return osdd.Exec_builder{
+		Cmd:  cmd,
+		Args: args,
+	}.Build()
+}
+
 func TestIDE_Materialize_Permissions(t *testing.T) {
 	allowBash := recipes.OperationPermission_builder{Bash: strPtr("go test:*")}.Build()
 	allowRead := recipes.OperationPermission_builder{Read: strPtr("~/.zshrc")}.Build()
@@ -99,7 +106,7 @@ func TestIDE_Materialize_Commands_TextAndCmd(t *testing.T) {
 				}.Build(),
 				recipes.Command_builder{
 					Name: "run",
-					From: recipes.CommandFrom_builder{Cmd: strPtr("echo 'hello from cmd'")}.Build(),
+					From: recipes.CommandFrom_builder{Cmd: ex("echo", "hello from cmd")}.Build(),
 				}.Build(),
 			},
 		}.Build(),

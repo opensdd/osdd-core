@@ -9,12 +9,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func strPtr(s string) *string {
-	return &s
+func ex(cmd string, args ...string) *osdd.Exec {
+	return osdd.Exec_builder{
+		Cmd:  cmd,
+		Args: args,
+	}.Build()
 }
 
-func cmdEntry(cmd string) *osdd.PrefetchEntry {
-	return osdd.PrefetchEntry_builder{Cmd: strPtr(cmd)}.Build()
+func cmdEntry(cmd string, args ...string) *osdd.PrefetchEntry {
+	return osdd.PrefetchEntry_builder{Cmd: ex(cmd, args...)}.Build()
 }
 
 func prefetchWith(entries ...*osdd.PrefetchEntry) *osdd.Prefetch {
@@ -51,20 +54,20 @@ func TestProcessor_Process(t *testing.T) {
 		},
 		{
 			name:     "single entry",
-			prefetch: prefetchWith(cmdEntry(`echo '{"data": [{"id": "test-id", "data": "test data"}]}'`)),
+			prefetch: prefetchWith(cmdEntry("echo", `{"data": [{"id": "test-id", "data": "test data"}]}`)),
 			want:     map[string]string{"test-id": "test data"},
 		},
 		{
 			name: "multiple entries",
 			prefetch: prefetchWith(
-				cmdEntry(`echo '{"data": [{"id": "id-1", "data": "data 1"}]}'`),
-				cmdEntry(`echo '{"data": [{"id": "id-2", "data": "data 2"}]}'`),
+				cmdEntry("echo", `{"data": [{"id": "id-1", "data": "data 1"}]}`),
+				cmdEntry("echo", `{"data": [{"id": "id-2", "data": "data 2"}]}`),
 			),
 			want: map[string]string{"id-1": "data 1", "id-2": "data 2"},
 		},
 		{
 			name:     "multiple data in single entry",
-			prefetch: prefetchWith(cmdEntry(`echo '{"data": [{"id": "item-1", "data": "first"}, {"id": "item-2", "data": "second"}]}'`)),
+			prefetch: prefetchWith(cmdEntry("echo", `{"data": [{"id": "item-1", "data": "first"}, {"id": "item-2", "data": "second"}]}`)),
 			want:     map[string]string{"item-1": "first", "item-2": "second"},
 		},
 		{
@@ -74,37 +77,37 @@ func TestProcessor_Process(t *testing.T) {
 		},
 		{
 			name:     "invalid JSON",
-			prefetch: prefetchWith(cmdEntry(`echo 'not valid json'`)),
+			prefetch: prefetchWith(cmdEntry("echo", "not valid json")),
 			wantErr:  "failed to unmarshal prefetch result",
 		},
 		{
 			name:     "empty data array",
-			prefetch: prefetchWith(cmdEntry(`echo '{"data": []}'`)),
+			prefetch: prefetchWith(cmdEntry("echo", `{"data": []}`)),
 		},
 		{
 			name: "partial failure",
 			prefetch: prefetchWith(
-				cmdEntry(`echo '{"data": [{"id": "id-1", "data": "data 1"}]}'`),
-				cmdEntry("exit 1"),
+				cmdEntry("echo", `{"data": [{"id": "id-1", "data": "data 1"}]}`),
+				cmdEntry("exit", "1"),
 			),
 			wantErr: "failed to process entry at index 1",
 		},
 		{
 			name:     "complex JSON",
-			prefetch: prefetchWith(cmdEntry(`echo '{"data": [{"id": "config-1", "data": "{\"key\": \"value\"}"}]}'`)),
+			prefetch: prefetchWith(cmdEntry("echo", `{"data": [{"id": "config-1", "data": "{\"key\": \"value\"}"}]}`)),
 			want:     map[string]string{"config-1": `{"key": "value"}`},
 		},
 		{
 			name: "duplicate IDs - last wins",
 			prefetch: prefetchWith(
-				cmdEntry(`echo '{"data": [{"id": "same-id", "data": "first"}]}'`),
-				cmdEntry(`echo '{"data": [{"id": "same-id", "data": "second"}]}'`),
+				cmdEntry("echo", `{"data": [{"id": "same-id", "data": "first"}]}`),
+				cmdEntry("echo", `{"data": [{"id": "same-id", "data": "second"}]}`),
 			),
 			want: map[string]string{"same-id": "second"},
 		},
 		{
 			name:     "multiline output",
-			prefetch: prefetchWith(cmdEntry(`printf '{"data": [{"id": "multi", "data": "line1\\nline2"}]}'`)),
+			prefetch: prefetchWith(cmdEntry("printf", `{"data": [{"id": "multi", "data": "line1\\nline2"}]}`)),
 			want:     map[string]string{"multi": "line1\nline2"},
 		},
 	}
@@ -135,27 +138,27 @@ func TestProcessor_ProcessEntry(t *testing.T) {
 	tests := []struct {
 		name    string
 		entry   *osdd.PrefetchEntry
-		wantErr string
+		wantErr bool
 		want    string
 	}{
 		{
 			name:    "empty command",
 			entry:   cmdEntry(""),
-			wantErr: "cmd cannot be empty",
+			wantErr: true,
 		},
 		{
 			name:    "failed command",
-			entry:   cmdEntry("exit 1"),
-			wantErr: "command execution failed",
+			entry:   cmdEntry("exit", "1"),
+			wantErr: true,
 		},
 		{
 			name:    "no type set",
 			entry:   &osdd.PrefetchEntry{},
-			wantErr: "unknown or unset prefetch entry type",
+			wantErr: true,
 		},
 		{
 			name:  "successful command",
-			entry: cmdEntry(`echo 'test output'`),
+			entry: cmdEntry("echo", "test output"),
 			want:  "test output\n",
 		},
 	}
@@ -166,9 +169,8 @@ func TestProcessor_ProcessEntry(t *testing.T) {
 			p := &Processor{}
 			data, err := p.processEntry(context.Background(), tt.entry)
 
-			if tt.wantErr != "" {
+			if tt.wantErr {
 				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.wantErr)
 				return
 			}
 

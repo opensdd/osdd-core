@@ -28,8 +28,8 @@ func textFrom(text string) *recipes.ContextFrom {
 	return recipes.ContextFrom_builder{Text: strPtr(text)}.Build()
 }
 
-func cmdFrom(cmd string) *recipes.ContextFrom {
-	return recipes.ContextFrom_builder{Cmd: strPtr(cmd)}.Build()
+func cmdFrom(cmd string, args ...string) *recipes.ContextFrom {
+	return recipes.ContextFrom_builder{Cmd: ex(cmd, args...)}.Build()
 }
 
 func githubFrom(path string) *recipes.ContextFrom {
@@ -48,8 +48,8 @@ func combinedTextItem(text string) *recipes.CombinedContextSource_Item {
 	return recipes.CombinedContextSource_Item_builder{Text: strPtr(text)}.Build()
 }
 
-func combinedCmdItem(cmd string) *recipes.CombinedContextSource_Item {
-	return recipes.CombinedContextSource_Item_builder{Cmd: strPtr(cmd)}.Build()
+func combinedCmdItem(cmd string, args ...string) *recipes.CombinedContextSource_Item {
+	return recipes.CombinedContextSource_Item_builder{Cmd: ex(cmd, args...)}.Build()
 }
 
 func combinedGithubItem(path string) *recipes.CombinedContextSource_Item {
@@ -174,7 +174,7 @@ func TestContext_FetchContent(t *testing.T) {
 		},
 		{
 			name: "command source",
-			from: cmdFrom("echo 'test output'"),
+			from: cmdFrom("echo", "test output"),
 			want: "test output\n",
 		},
 		{
@@ -186,7 +186,7 @@ func TestContext_FetchContent(t *testing.T) {
 			name: "combined source",
 			from: combinedFrom(
 				combinedTextItem("# Overview: "),
-				combinedCmdItem("echo 'from command'"),
+				combinedCmdItem("echo", "from command"),
 				combinedTextItem("\n# End"),
 			),
 			want: "# Overview: from command\n\n# End",
@@ -210,26 +210,33 @@ func TestContext_FetchContent(t *testing.T) {
 	}
 }
 
+func ex(cmd string, args ...string) *osdd.Exec {
+	return osdd.Exec_builder{
+		Cmd:  cmd,
+		Args: args,
+	}.Build()
+}
+
 func TestUtils_ExecuteCommand(t *testing.T) {
 	tests := []struct {
 		name    string
-		cmd     string
+		cmd     *osdd.Exec
 		want    string
 		wantErr bool
 	}{
 		{
 			name: "success",
-			cmd:  "echo 'test output'",
+			cmd:  ex("echo", "test output"),
 			want: "test output\n",
 		},
 		{
 			name:    "empty command",
-			cmd:     "",
+			cmd:     ex(""),
 			wantErr: true,
 		},
 		{
 			name:    "failed command",
-			cmd:     "exit 1",
+			cmd:     ex("exit", "1"),
 			wantErr: true,
 		},
 	}
@@ -317,7 +324,7 @@ func TestContext_FetchCombined(t *testing.T) {
 			combined: recipes.CombinedContextSource_builder{
 				Items: []*recipes.CombinedContextSource_Item{
 					combinedTextItem("# Overview: "),
-					combinedCmdItem("echo 'from command'"),
+					combinedCmdItem("echo", "from command"),
 					combinedTextItem("\n# End"),
 				},
 			}.Build(),
@@ -337,7 +344,7 @@ func TestContext_FetchCombined(t *testing.T) {
 			combined: recipes.CombinedContextSource_builder{
 				Items: []*recipes.CombinedContextSource_Item{
 					combinedTextItem("text1"),
-					combinedCmdItem("exit 1"),
+					combinedCmdItem("exit", "1"),
 				},
 			}.Build(),
 			wantErr: "failed to fetch combined item",
@@ -382,7 +389,7 @@ func TestContext_FetchCombinedItem(t *testing.T) {
 		},
 		{
 			name: "cmd",
-			item: combinedCmdItem("echo 'cmd output'"),
+			item: combinedCmdItem("echo", "cmd output"),
 			want: "cmd output\n",
 		},
 		{

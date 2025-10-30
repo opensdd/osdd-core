@@ -26,6 +26,13 @@ func strPtr(s string) *string {
 	return &s
 }
 
+func ex(cmd string, args ...string) *osdd.Exec {
+	return osdd.Exec_builder{
+		Cmd:  cmd,
+		Args: args,
+	}.Build()
+}
+
 func TestRecipe_Materialize_NilRecipe(t *testing.T) {
 	t.Parallel()
 	r := &providers.Recipe{IDE: getIDE()}
@@ -167,7 +174,7 @@ func TestRecipe_Materialize_ComplexRecipe(t *testing.T) {
 				recipes.ContextEntry_builder{
 					Path: "context/from-cmd.txt",
 					From: recipes.ContextFrom_builder{
-						Cmd: strPtr("echo 'command output'"),
+						Cmd: ex("echo", "command output"),
 					}.Build(),
 				}.Build(),
 				recipes.ContextEntry_builder{
@@ -192,7 +199,7 @@ func TestRecipe_Materialize_ComplexRecipe(t *testing.T) {
 					recipes.Command_builder{
 						Name: "format",
 						From: recipes.CommandFrom_builder{
-							Cmd: strPtr("echo 'format code'"),
+							Cmd: ex("echo", "format code"),
 						}.Build(),
 					}.Build(),
 				},
@@ -310,7 +317,7 @@ func TestRecipe_Materialize_ContextWithCombinedSource(t *testing.T) {
 									Text: strPtr("# Header\n"),
 								}.Build(),
 								recipes.CombinedContextSource_Item_builder{
-									Cmd: strPtr("echo 'Body content'"),
+									Cmd: ex("echo", "Body content"),
 								}.Build(),
 								recipes.CombinedContextSource_Item_builder{
 									Text: strPtr("\n# Footer"),

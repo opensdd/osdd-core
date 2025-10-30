@@ -52,7 +52,7 @@ func TestContext_IntegrationTest_CmdSource(t *testing.T) {
 			recipes.ContextEntry_builder{
 				Path: "cmd_output.txt",
 				From: recipes.ContextFrom_builder{
-					Cmd: strPtr("echo 'command result'"),
+					Cmd: ex("echo", "command result"),
 				}.Build(),
 			}.Build(),
 		},
@@ -87,7 +87,7 @@ func TestContext_IntegrationTest_MultipleEntries(t *testing.T) {
 			recipes.ContextEntry_builder{
 				Path: "file2.txt",
 				From: recipes.ContextFrom_builder{
-					Cmd: strPtr("echo 'content 2'"),
+					Cmd: ex("echo", "content 2"),
 				}.Build(),
 			}.Build(),
 		},
@@ -124,7 +124,7 @@ func TestContext_IntegrationTest_FailFast(t *testing.T) {
 			recipes.ContextEntry_builder{
 				Path: "file1.txt",
 				From: recipes.ContextFrom_builder{
-					Cmd: strPtr("exit 1"), // This will fail
+					Cmd: ex("exit", "1"), // This will fail
 				}.Build(),
 			}.Build(),
 			recipes.ContextEntry_builder{

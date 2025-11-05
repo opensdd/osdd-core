@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/opensdd/osdd-api/clients/go/osdd/recipes"
+	"github.com/opensdd/osdd-core/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,7 +21,7 @@ func getIDE() *IDE {
 func TestIDE_Materialize_NilIde(t *testing.T) {
 	t.Parallel()
 	g := getIDE()
-	_, err := g.Materialize(context.Background(), nil)
+	_, err := g.Materialize(context.Background(), &core.GenerationContext{}, nil)
 	assert.Error(t, err)
 }
 
@@ -35,7 +36,7 @@ func TestIDE_Materialize_Mcp(t *testing.T) {
 		}}.Build(),
 	}.Build()
 
-	res, err := g.Materialize(context.Background(), ide)
+	res, err := g.Materialize(context.Background(), &core.GenerationContext{}, ide)
 	require.NoError(t, err)
 
 	var mcpContent string

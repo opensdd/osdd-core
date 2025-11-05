@@ -3,6 +3,8 @@ package generators
 import (
 	"context"
 	"fmt"
+	"os"
+	"slices"
 	"strings"
 
 	"github.com/opensdd/osdd-api/clients/go/osdd"
@@ -26,6 +28,10 @@ func (c *Context) Materialize(ctx context.Context, contextMsg *recipes.Context, 
 	var resultEntries []*osdd.MaterializedResult_Entry
 
 	for _, entry := range entries {
+		ideFilter := entry.GetFilter().GetIde()
+		if len(ideFilter) > 0 && genCtx.IDE != "" && !slices.Contains(ideFilter, genCtx.IDE) {
+			continue
+		}
 		materializedEntry, err := c.materializeEntry(ctx, entry, genCtx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to materialize entry for path %s: %w", entry.GetPath(), err)
@@ -89,6 +95,17 @@ func (c *Context) fetchContent(ctx context.Context, from *recipes.ContextFrom, g
 	case recipes.ContextFrom_UserInput_case:
 		return renderUserInput(from.GetUserInput(), genCtx)
 
+	case recipes.ContextFrom_LocalFile_case:
+		p := strings.TrimSpace(from.GetLocalFile())
+		if p == "" {
+			return "", fmt.Errorf("local file path cannot be empty")
+		}
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return "", fmt.Errorf("failed to read local file %s: %w", p, err)
+		}
+		return string(b), nil
+
 	default:
 		return "", fmt.Errorf("unknown or unset context source type")
 	}
@@ -140,6 +157,17 @@ func (c *Context) fetchCombinedItem(ctx context.Context, item *recipes.CombinedC
 
 	case recipes.CombinedContextSource_Item_UserInput_case:
 		return renderUserInput(item.GetUserInput(), genCtx)
+
+	case recipes.CombinedContextSource_Item_LocalFile_case:
+		p := strings.TrimSpace(item.GetLocalFile())
+		if p == "" {
+			return "", fmt.Errorf("local file path cannot be empty")
+		}
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return "", fmt.Errorf("failed to read local file %s: %w", p, err)
+		}
+		return string(b), nil
 
 	default:
 		return "", fmt.Errorf("unknown or unset combined item type")

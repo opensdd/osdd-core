@@ -63,7 +63,7 @@ func PersistMaterializedResult(_ context.Context, root string, result *osdd.Mate
 			return fmt.Errorf("entry %d: path escapes root: %s", i, p)
 		}
 
-		// Create parent directories.
+		// Materialize parent directories.
 		dir := filepath.Dir(full)
 		log.Debug("Creating directory", "dir", dir)
 		if err := os.MkdirAll(dir, 0o755); err != nil {

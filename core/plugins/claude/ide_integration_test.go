@@ -18,7 +18,7 @@ func TestIDE_Materialize_Permissions_MergeWithExisting(t *testing.T) {
 		t.Skip()
 	}
 	t.Parallel()
-	// Setup: Create a temporary directory and existing settings file
+	// Setup: Materialize a temporary directory and existing settings file
 	tempDir := t.TempDir()
 	claudeDir := filepath.Join(tempDir, ".claude")
 	require.NoError(t, os.MkdirAll(claudeDir, 0755))
@@ -29,7 +29,7 @@ func TestIDE_Materialize_Permissions_MergeWithExisting(t *testing.T) {
 	require.NoError(t, os.Chdir(tempDir))
 	defer func() { _ = os.Chdir(origDir) }()
 
-	// Create existing settings file with some permissions
+	// Materialize existing settings file with some permissions
 	existingSettings := `{
   "permissions": {
     "allow": [
@@ -102,7 +102,7 @@ func TestIDE_Materialize_McpServers_AutoAddPermissions(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
-	// Setup: Create a temporary directory
+	// Setup: Materialize a temporary directory
 	tempDir := t.TempDir()
 	claudeDir := filepath.Join(tempDir, ".claude")
 	require.NoError(t, os.MkdirAll(claudeDir, 0755))
@@ -160,7 +160,7 @@ func TestIDE_Materialize_McpServers_AutoAddPermissions(t *testing.T) {
 }
 
 func TestIDE_Materialize_Permissions_Deduplication(t *testing.T) {
-	// Setup: Create a temporary directory and existing settings file
+	// Setup: Materialize a temporary directory and existing settings file
 	tempDir := t.TempDir()
 	claudeDir := filepath.Join(tempDir, ".claude")
 	require.NoError(t, os.MkdirAll(claudeDir, 0755))
@@ -171,7 +171,7 @@ func TestIDE_Materialize_Permissions_Deduplication(t *testing.T) {
 	require.NoError(t, os.Chdir(tempDir))
 	defer func() { _ = os.Chdir(origDir) }()
 
-	// Create existing settings file with duplicate permission
+	// Materialize existing settings file with duplicate permission
 	existingSettings := `{
   "permissions": {
     "allow": [
@@ -235,7 +235,7 @@ func TestIDE_Materialize_Permissions_Deduplication(t *testing.T) {
 }
 
 func TestIDE_Materialize_Permissions_InvalidExistingJSON(t *testing.T) {
-	// Setup: Create a temporary directory with invalid JSON
+	// Setup: Materialize a temporary directory with invalid JSON
 	tempDir := t.TempDir()
 	claudeDir := filepath.Join(tempDir, ".claude")
 	require.NoError(t, os.MkdirAll(claudeDir, 0755))
@@ -246,7 +246,7 @@ func TestIDE_Materialize_Permissions_InvalidExistingJSON(t *testing.T) {
 	require.NoError(t, os.Chdir(tempDir))
 	defer func() { _ = os.Chdir(origDir) }()
 
-	// Create existing settings file with invalid JSON
+	// Materialize existing settings file with invalid JSON
 	invalidJSON := `{ "permissions": { "allow": ["test" }`
 	require.NoError(t, os.WriteFile(filepath.Join(claudeDir, "settings.local.json"), []byte(invalidJSON), 0644))
 
@@ -289,7 +289,7 @@ func TestIDE_Materialize_Permissions_InvalidExistingJSON(t *testing.T) {
 }
 
 func TestIDE_Materialize_Permissions_NoExistingFile(t *testing.T) {
-	// Setup: Create a temporary directory without existing settings
+	// Setup: Materialize a temporary directory without existing settings
 	tempDir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(tempDir, ".claude"), 0755))
 
@@ -340,7 +340,7 @@ func TestIDE_Materialize_Permissions_NoExistingFile(t *testing.T) {
 }
 
 func TestIDE_Materialize_McpServers_PreserveExistingMcpPermissions(t *testing.T) {
-	// Setup: Create a temporary directory with existing MCP permissions
+	// Setup: Materialize a temporary directory with existing MCP permissions
 	tempDir := t.TempDir()
 	claudeDir := filepath.Join(tempDir, ".claude")
 	require.NoError(t, os.MkdirAll(claudeDir, 0755))
@@ -351,7 +351,7 @@ func TestIDE_Materialize_McpServers_PreserveExistingMcpPermissions(t *testing.T)
 	require.NoError(t, os.Chdir(tempDir))
 	defer func() { _ = os.Chdir(origDir) }()
 
-	// Create existing settings with MCP server already enabled and in allow list
+	// Materialize existing settings with MCP server already enabled and in allow list
 	existingSettings := `{
   "permissions": {
     "allow": [
@@ -426,7 +426,7 @@ func TestIDE_Materialize_McpServers_PreserveExistingMcpPermissions(t *testing.T)
 }
 
 func TestIDE_Materialize_McpServers_MergeWithExistingPermissions(t *testing.T) {
-	// Setup: Create a temporary directory with existing permissions
+	// Setup: Materialize a temporary directory with existing permissions
 	tempDir := t.TempDir()
 	claudeDir := filepath.Join(tempDir, ".claude")
 	require.NoError(t, os.MkdirAll(claudeDir, 0755))
@@ -437,7 +437,7 @@ func TestIDE_Materialize_McpServers_MergeWithExistingPermissions(t *testing.T) {
 	require.NoError(t, os.Chdir(tempDir))
 	defer func() { _ = os.Chdir(origDir) }()
 
-	// Create existing settings with some permissions
+	// Materialize existing settings with some permissions
 	existingSettings := `{
   "permissions": {
     "allow": [

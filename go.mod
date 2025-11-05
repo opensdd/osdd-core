@@ -3,9 +3,10 @@ module github.com/opensdd/osdd-core
 go 1.25.1
 
 require (
-	github.com/opensdd/osdd-api/clients/go v0.5.2
+	github.com/opensdd/osdd-api/clients/go v0.5.3
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/protobuf v1.36.10
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -14,5 +15,4 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

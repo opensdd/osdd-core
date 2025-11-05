@@ -2,11 +2,14 @@ package generators
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/opensdd/osdd-api/clients/go/osdd"
 	"github.com/opensdd/osdd-api/clients/go/osdd/recipes"
+	"github.com/opensdd/osdd-core/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -173,4 +176,78 @@ func TestContext_IntegrationTest_RealGithubFetch(t *testing.T) {
 	content := file.GetContent()
 	assert.NotEmpty(t, content, "fetched content is empty")
 	assert.Contains(t, strings.ToLower(content), "devplan", "fetched content doesn't appear to be the devplan README")
+}
+
+func TestContext_IntegrationTest_LocalFileSource(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	t.Parallel()
+	c := &Context{}
+
+	tmp := t.TempDir()
+	p := filepath.Join(tmp, "local.txt")
+	want := "local file integration content"
+	require.NoError(t, os.WriteFile(p, []byte(want), 0o644))
+
+	ctx := recipes.Context_builder{
+		Entries: []*recipes.ContextEntry{
+			recipes.ContextEntry_builder{
+				Path: "from_local.txt",
+				From: recipes.ContextFrom_builder{
+					LocalFile: &p,
+				}.Build(),
+			}.Build(),
+		},
+	}.Build()
+
+	result, err := c.Materialize(context.Background(), ctx, &core.GenerationContext{})
+	require.NoError(t, err)
+	require.Len(t, result.GetEntries(), 1)
+
+	entry := result.GetEntries()[0]
+	require.True(t, entry.HasFile())
+	file := entry.GetFile()
+	assert.Equal(t, "from_local.txt", file.GetPath())
+	assert.Equal(t, want, file.GetContent())
+}
+
+func TestContext_IntegrationTest_Combined_LocalFileItem(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	t.Parallel()
+	c := &Context{}
+
+	tmp := t.TempDir()
+	p := filepath.Join(tmp, "data.txt")
+	fileContent := "DATA_FROM_FILE"
+	require.NoError(t, os.WriteFile(p, []byte(fileContent), 0o644))
+
+	ctx := recipes.Context_builder{
+		Entries: []*recipes.ContextEntry{
+			recipes.ContextEntry_builder{
+				Path: "combined.txt",
+				From: recipes.ContextFrom_builder{
+					Combined: recipes.CombinedContextSource_builder{
+						Items: []*recipes.CombinedContextSource_Item{
+							recipes.CombinedContextSource_Item_builder{Text: strPtr("prefix:")}.Build(),
+							recipes.CombinedContextSource_Item_builder{LocalFile: &p}.Build(),
+							recipes.CombinedContextSource_Item_builder{Text: strPtr(":suffix")}.Build(),
+						},
+					}.Build(),
+				}.Build(),
+			}.Build(),
+		},
+	}.Build()
+
+	result, err := c.Materialize(context.Background(), ctx, &core.GenerationContext{})
+	require.NoError(t, err)
+	require.Len(t, result.GetEntries(), 1)
+
+	entry := result.GetEntries()[0]
+	require.True(t, entry.HasFile())
+	file := entry.GetFile()
+	assert.Equal(t, "combined.txt", file.GetPath())
+	assert.Equal(t, "prefix:"+fileContent+":suffix", file.GetContent())
 }

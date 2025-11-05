@@ -9,16 +9,16 @@ import (
 
 func Test_buildGitHubRecipeURL_SingleName(t *testing.T) {
 	t.Parallel()
-	url, err := buildGitHubRecipeURL("agents_md")
+	url, err := buildGitHubBaseRecipeURL("agents_md")
 	require.NoError(t, err)
-	assert.Equal(t, "https://github.com/opensdd/recipes/global/agents_md/recipe.json", url)
+	assert.Equal(t, "https://github.com/opensdd/recipes/global/agents_md/recipe", url)
 }
 
 func Test_buildGitHubRecipeURL_OwnerRepoName(t *testing.T) {
 	t.Parallel()
-	url, err := buildGitHubRecipeURL("owner/repo/my_recipe")
+	url, err := buildGitHubBaseRecipeURL("owner/repo/my_recipe")
 	require.NoError(t, err)
-	assert.Equal(t, "https://github.com/owner/repo/opensdd_recipes/my_recipe/recipe.json", url)
+	assert.Equal(t, "https://github.com/owner/repo/opensdd_recipes/my_recipe/recipe", url)
 }
 
 func Test_FetchRecipe_InvalidID(t *testing.T) {

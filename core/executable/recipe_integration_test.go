@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/opensdd/osdd-api/clients/go/osdd/recipes"
+	"github.com/opensdd/osdd-core/core"
 	"github.com/opensdd/osdd-core/core/executable"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,7 +37,7 @@ func TestExecutableRecipe_Materialize_FromJSON_Integration(t *testing.T) {
 
 	// Materialize through the executable layer
 	r := executable.ForRecipe(exec)
-	res, err := r.Materialize(context.Background())
+	res, err := r.Materialize(context.Background(), &core.GenerationContext{})
 	require.NoError(t, err)
 	require.NotNil(t, res)
 

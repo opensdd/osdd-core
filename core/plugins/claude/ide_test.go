@@ -9,6 +9,7 @@ import (
 
 	"github.com/opensdd/osdd-api/clients/go/osdd"
 	"github.com/opensdd/osdd-api/clients/go/osdd/recipes"
+	"github.com/opensdd/osdd-core/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -69,7 +70,7 @@ func TestIDE_Materialize_Commands_AddedToAllow(t *testing.T) {
 		}}.Build(),
 	}.Build()
 
-	res, err := g.Materialize(context.Background(), ide)
+	res, err := g.Materialize(context.Background(), &core.GenerationContext{}, ide)
 	require.NoError(t, err)
 	require.NotNil(t, res)
 
@@ -112,7 +113,7 @@ func TestIDE_Materialize_Commands_TextAndCmd(t *testing.T) {
 		}.Build(),
 	}.Build()
 
-	res, err := g.Materialize(context.Background(), ide)
+	res, err := g.Materialize(context.Background(), &core.GenerationContext{}, ide)
 	require.NoError(t, err)
 	require.NotNil(t, res)
 
@@ -146,7 +147,7 @@ func TestIDE_Materialize_Command_Github(t *testing.T) {
 		}.Build(),
 	}.Build()
 
-	res, err := g.Materialize(context.Background(), ide)
+	res, err := g.Materialize(context.Background(), &core.GenerationContext{}, ide)
 	require.NoError(t, err)
 	require.NotNil(t, res)
 	// Find the command entry for gh

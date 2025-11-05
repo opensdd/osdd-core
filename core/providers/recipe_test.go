@@ -9,6 +9,7 @@ import (
 
 	"github.com/opensdd/osdd-api/clients/go/osdd"
 	"github.com/opensdd/osdd-api/clients/go/osdd/recipes"
+	"github.com/opensdd/osdd-core/core"
 	"github.com/opensdd/osdd-core/core/plugins/shared"
 	"github.com/opensdd/osdd-core/core/providers"
 	"github.com/stretchr/testify/assert"
@@ -36,7 +37,7 @@ func ex(cmd string, args ...string) *osdd.Exec {
 func TestRecipe_Materialize_NilRecipe(t *testing.T) {
 	t.Parallel()
 	r := &providers.Recipe{IDE: getIDE()}
-	_, err := r.Materialize(context.Background(), nil)
+	_, err := r.Materialize(context.Background(), &core.GenerationContext{}, nil)
 	assert.Error(t, err, "expected error for nil recipe")
 }
 
@@ -44,7 +45,7 @@ func TestRecipe_Materialize_EmptyRecipe(t *testing.T) {
 	t.Parallel()
 	r := &providers.Recipe{IDE: getIDE()}
 	recipe := recipes.Recipe_builder{}.Build()
-	result, err := r.Materialize(context.Background(), recipe)
+	result, err := r.Materialize(context.Background(), &core.GenerationContext{}, recipe)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Empty(t, result.GetEntries())
@@ -67,7 +68,7 @@ func TestRecipe_Materialize_ContextOnly(t *testing.T) {
 		}.Build(),
 	}.Build()
 
-	result, err := r.Materialize(context.Background(), recipe)
+	result, err := r.Materialize(context.Background(), &core.GenerationContext{}, recipe)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Len(t, result.GetEntries(), 1)
@@ -96,7 +97,7 @@ func TestRecipe_Materialize_IdeOnly(t *testing.T) {
 		}.Build(),
 	}.Build()
 
-	result, err := r.Materialize(context.Background(), recipe)
+	result, err := r.Materialize(context.Background(), &core.GenerationContext{}, recipe)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
@@ -137,7 +138,7 @@ func TestRecipe_Materialize_ContextAndIde(t *testing.T) {
 		}.Build(),
 	}.Build()
 
-	result, err := r.Materialize(context.Background(), recipe)
+	result, err := r.Materialize(context.Background(), &core.GenerationContext{}, recipe)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
@@ -228,7 +229,7 @@ func TestRecipe_Materialize_ComplexRecipe(t *testing.T) {
 		}.Build(),
 	}.Build()
 
-	result, err := r.Materialize(context.Background(), recipe)
+	result, err := r.Materialize(context.Background(), &core.GenerationContext{}, recipe)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
@@ -274,7 +275,7 @@ func TestRecipe_Materialize_InvalidContext(t *testing.T) {
 		}.Build(),
 	}.Build()
 
-	_, err := r.Materialize(context.Background(), recipe)
+	_, err := r.Materialize(context.Background(), &core.GenerationContext{}, recipe)
 	assert.Error(t, err, "expected error for invalid context entry")
 	assert.Contains(t, err.Error(), "failed to materialize context")
 }
@@ -296,7 +297,7 @@ func TestRecipe_Materialize_InvalidIde(t *testing.T) {
 		}.Build(),
 	}.Build()
 
-	_, err := r.Materialize(context.Background(), recipe)
+	_, err := r.Materialize(context.Background(), &core.GenerationContext{}, recipe)
 	assert.Error(t, err, "expected error for invalid IDE command")
 	assert.Contains(t, err.Error(), "failed to materialize IDE configuration")
 }
@@ -330,7 +331,7 @@ func TestRecipe_Materialize_ContextWithCombinedSource(t *testing.T) {
 		}.Build(),
 	}.Build()
 
-	result, err := r.Materialize(context.Background(), recipe)
+	result, err := r.Materialize(context.Background(), &core.GenerationContext{}, recipe)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Len(t, result.GetEntries(), 1)
@@ -360,7 +361,7 @@ func TestRecipe_Materialize_MultiplePermissions(t *testing.T) {
 		}.Build(),
 	}.Build()
 
-	result, err := r.Materialize(context.Background(), recipe)
+	result, err := r.Materialize(context.Background(), &core.GenerationContext{}, recipe)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Len(t, result.GetEntries(), 0)
@@ -394,7 +395,7 @@ func TestRecipe_Materialize_MultipleMcpServers(t *testing.T) {
 		}.Build(),
 	}.Build()
 
-	result, err := r.Materialize(context.Background(), recipe)
+	result, err := r.Materialize(context.Background(), &core.GenerationContext{}, recipe)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 

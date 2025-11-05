@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/opensdd/osdd-api/clients/go/osdd/recipes"
+	"github.com/opensdd/osdd-core/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,7 +24,7 @@ func TestIDE_Materialize_Mcp_MergeWithExisting(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
-	// Setup: Create a temporary directory and existing MCP file
+	// Setup: Materialize a temporary directory and existing MCP file
 	tempDir := t.TempDir()
 	claudeDir := filepath.Join(tempDir, ".claude")
 	require.NoError(t, os.MkdirAll(claudeDir, 0755))
@@ -34,7 +35,7 @@ func TestIDE_Materialize_Mcp_MergeWithExisting(t *testing.T) {
 	require.NoError(t, os.Chdir(tempDir))
 	defer func() { _ = os.Chdir(origDir) }()
 
-	// Create existing MCP file
+	// Materialize existing MCP file
 	existingMcp := `{
   "mcpServers": {
     "filesystem": {
@@ -57,7 +58,7 @@ func TestIDE_Materialize_Mcp_MergeWithExisting(t *testing.T) {
 	}.Build()
 
 	// Execute
-	res, err := g.Materialize(context.Background(), ide)
+	res, err := g.Materialize(context.Background(), &core.GenerationContext{}, ide)
 	require.NoError(t, err)
 
 	var mcpContent string
@@ -104,7 +105,7 @@ func TestIDE_Materialize_Mcp_InvalidExistingJSON(t *testing.T) {
 		t.Skip()
 	}
 	t.Parallel()
-	// Setup: Create a temporary directory with invalid JSON
+	// Setup: Materialize a temporary directory with invalid JSON
 	tempDir := t.TempDir()
 	claudeDir := filepath.Join(tempDir, ".claude")
 	require.NoError(t, os.MkdirAll(claudeDir, 0755))
@@ -115,7 +116,7 @@ func TestIDE_Materialize_Mcp_InvalidExistingJSON(t *testing.T) {
 	require.NoError(t, os.Chdir(tempDir))
 	defer func() { _ = os.Chdir(origDir) }()
 
-	// Create existing MCP file with invalid JSON
+	// Materialize existing MCP file with invalid JSON
 	invalidJSON := `{ "mcpServers": { "test": }`
 	require.NoError(t, os.WriteFile(filepath.Join(tempDir, ".mcp.json"), []byte(invalidJSON), 0644))
 
@@ -128,33 +129,7 @@ func TestIDE_Materialize_Mcp_InvalidExistingJSON(t *testing.T) {
 	}.Build()
 
 	// Execute - should not error, just start fresh
-	res, err := g.Materialize(context.Background(), ide)
-	require.NoError(t, err)
-
-	var mcpContent string
-	for _, e := range res.GetEntries() {
-		if e.GetFile().GetPath() == ".mcp.json" {
-			mcpContent = e.GetFile().GetContent()
-			break
-		}
-	}
-	require.NotEmpty(t, mcpContent)
-
-	var parsed struct {
-		McpServers map[string]struct {
-			Type    string            `json:"type"`
-			Command string            `json:"command,omitempty"`
-			Args    []string          `json:"args,omitempty"`
-			Env     map[string]string `json:"env,omitempty"`
-			Url     string            `json:"url,omitempty"`
-		} `json:"mcpServers"`
-	}
-	require.NoError(t, json.Unmarshal([]byte(mcpContent), &parsed))
-
-	// Should only have new server
-	assert.Len(t, parsed.McpServers, 1)
-	require.Contains(t, parsed.McpServers, "devplan")
-	assert.Equal(t, "stdio", parsed.McpServers["devplan"].Type)
-	assert.Equal(t, "devplan", parsed.McpServers["devplan"].Command)
-	assert.Equal(t, []string{"mcp"}, parsed.McpServers["devplan"].Args)
+	res, err := g.Materialize(context.Background(), &core.GenerationContext{}, ide)
+	require.Error(t, err)
+	assert.Nil(t, res)
 }

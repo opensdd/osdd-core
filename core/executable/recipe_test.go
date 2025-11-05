@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/opensdd/osdd-api/clients/go/osdd/recipes"
+	"github.com/opensdd/osdd-core/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -52,7 +53,7 @@ func TestExecutableRecipe_Materialize_Table(t *testing.T) {
 			exec.EntryPoint = recipes.EntryPoint_builder{IdeType: tt.ideType}.Build()
 			re := ForRecipe(exec.Build())
 
-			res, err := re.Materialize(context.Background())
+			res, err := re.Materialize(context.Background(), &core.GenerationContext{})
 			if tt.wantErrSub != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErrSub)

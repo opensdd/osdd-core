@@ -9,6 +9,7 @@ import (
 
 	"github.com/opensdd/osdd-api/clients/go/osdd"
 	"github.com/opensdd/osdd-api/clients/go/osdd/recipes"
+	"github.com/opensdd/osdd-core/core"
 	"github.com/opensdd/osdd-core/core/utils"
 )
 
@@ -42,7 +43,7 @@ func (n *noOpSettings) Update(context.Context, SettingsInput) ([]*osdd.Materiali
 // - <CommandsFolder>/<name>.md files for each command
 // - <MCPServersJSONPath> for MCP server definitions
 // - settings updated/created by IDESettings
-func (i *IDE) Materialize(ctx context.Context, ide *recipes.Ide) (*osdd.MaterializedResult, error) {
+func (i *IDE) Materialize(ctx context.Context, _ *core.GenerationContext, ide *recipes.Ide) (*osdd.MaterializedResult, error) {
 	if ide == nil {
 		return nil, fmt.Errorf("ide cannot be nil")
 	}
@@ -95,6 +96,10 @@ func (i *IDE) Materialize(ctx context.Context, ide *recipes.Ide) (*osdd.Material
 	entries = append(entries, mcpEntries...)
 
 	return osdd.MaterializedResult_builder{Entries: entries}.Build(), nil
+}
+
+func (i *IDE) PrepareStart(context.Context, *core.GenerationContext) (core.ExecProps, error) {
+	return core.ExecProps{}, nil
 }
 
 func (i *IDE) materializeCommands(ctx context.Context, commands *recipes.Commands) ([]*osdd.MaterializedResult_Entry, error) {
@@ -164,15 +169,104 @@ func (i *IDE) fetchCommandContent(ctx context.Context, from *recipes.CommandFrom
 }
 
 type mcpServerConfig struct {
-	Type    string            `json:"type,omitempty"`
-	Command string            `json:"command,omitempty"`
-	Args    []string          `json:"args,omitempty"`
-	Env     map[string]string `json:"env,omitempty"`
-	Url     string            `json:"url,omitempty"`
+	Type    string                 `json:"type,omitempty"`
+	Command string                 `json:"command,omitempty"`
+	Args    []string               `json:"args,omitempty"`
+	Env     map[string]string      `json:"env,omitempty"`
+	Url     string                 `json:"url,omitempty"`
+	Extra   map[string]interface{} `json:"-"` // preserve unknown fields
+}
+
+func (m *mcpServerConfig) UnmarshalJSON(data []byte) error {
+	type Alias mcpServerConfig
+	aux := &struct {
+		*Alias
+	}{
+		Alias: (*Alias)(m),
+	}
+
+	var raw map[string]interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	delete(raw, "type")
+	delete(raw, "command")
+	delete(raw, "args")
+	delete(raw, "env")
+	delete(raw, "url")
+
+	m.Extra = raw
+	return nil
+}
+
+func (m *mcpServerConfig) MarshalJSON() ([]byte, error) {
+	out := map[string]interface{}{}
+
+	if m.Type != "" {
+		out["type"] = m.Type
+	}
+	if m.Command != "" {
+		out["command"] = m.Command
+	}
+	if m.Args != nil {
+		out["args"] = m.Args
+	}
+	if m.Env != nil {
+		out["env"] = m.Env
+	}
+	if m.Url != "" {
+		out["url"] = m.Url
+	}
+
+	// Merge extra fields
+	for k, v := range m.Extra {
+		out[k] = v
+	}
+
+	return json.Marshal(out)
 }
 
 type mcpJson struct {
 	McpServers map[string]mcpServerConfig `json:"mcpServers"`
+	Extra      map[string]interface{}     `json:"-"` // we'll handle this manually
+}
+
+func (m *mcpJson) UnmarshalJSON(data []byte) error {
+	type Alias mcpJson
+	aux := &struct {
+		*Alias
+	}{
+		Alias: (*Alias)(m),
+	}
+	var raw map[string]interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	delete(raw, "mcpServers")
+
+	m.Extra = raw
+	return nil
+}
+
+func (m *mcpJson) MarshalJSON() ([]byte, error) {
+	out := map[string]interface{}{
+		"mcpServers": m.McpServers,
+	}
+	// Merge extra fields
+	for k, v := range m.Extra {
+		out[k] = v
+	}
+	return json.Marshal(out)
 }
 
 func buildMcpJSON(mcp *recipes.Mcp, existingContent string) (string, error) {
@@ -180,19 +274,11 @@ func buildMcpJSON(mcp *recipes.Mcp, existingContent string) (string, error) {
 		return "", fmt.Errorf("mcp cannot be nil")
 	}
 
-	var cm mcpJson
-
-	// Parse existing content if provided
+	cm := &mcpJson{}
 	if existingContent != "" {
-		if err := json.Unmarshal([]byte(existingContent), &cm); err != nil {
-			// If parsing fails, start fresh
-			cm = mcpJson{}
+		if err := json.Unmarshal([]byte(existingContent), cm); err != nil {
+			return "", fmt.Errorf("failed to parse existing mcp json: %w", err)
 		}
-	}
-
-	// Ensure the map is initialized
-	if cm.McpServers == nil {
-		cm.McpServers = map[string]mcpServerConfig{}
 	}
 
 	// Add or update servers from the new configuration
@@ -227,6 +313,9 @@ func buildMcpJSON(mcp *recipes.Mcp, existingContent string) (string, error) {
 		}
 		// If we set at least a type, keep the server
 		if srv.Type != "" || srv.Url != "" || srv.Command != "" {
+			if cm.McpServers == nil {
+				cm.McpServers = map[string]mcpServerConfig{}
+			}
 			cm.McpServers[name] = srv
 		}
 	}

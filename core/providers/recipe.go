@@ -15,18 +15,24 @@ type Recipe struct {
 	IDE IDE
 }
 
-func (r *Recipe) Materialize(ctx context.Context, recipe *recipes.Recipe) (*osdd.MaterializedResult, error) {
+func (r *Recipe) Materialize(
+	ctx context.Context, genCtx *core.GenerationContext, recipe *recipes.Recipe,
+) (*osdd.MaterializedResult, error) {
 	if recipe == nil {
 		return nil, fmt.Errorf("recipe cannot be nil")
 	}
-	genCtx := &core.GenerationContext{}
 	if pf := recipe.GetPrefetch(); pf != nil {
 		p := prefetch.Processor{}
 		entries, err := p.Process(ctx, pf)
 		if err != nil {
 			return nil, fmt.Errorf("failed to process prefetch: %w", err)
 		}
-		genCtx.Prefetched = entries
+		if genCtx.Prefetched == nil {
+			genCtx.Prefetched = make(map[string]*osdd.FetchedData)
+		}
+		for k, v := range entries {
+			genCtx.Prefetched[k] = v
+		}
 	}
 
 	var resultEntries []*osdd.MaterializedResult_Entry
@@ -43,7 +49,7 @@ func (r *Recipe) Materialize(ctx context.Context, recipe *recipes.Recipe) (*osdd
 
 	// Materialize IDE configuration if present
 	if recipe.HasIde() {
-		ideResult, err := r.IDE.Materialize(ctx, recipe.GetIde())
+		ideResult, err := r.IDE.Materialize(ctx, genCtx, recipe.GetIde())
 		if err != nil {
 			return nil, fmt.Errorf("failed to materialize IDE configuration: %w", err)
 		}

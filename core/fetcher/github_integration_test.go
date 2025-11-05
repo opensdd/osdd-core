@@ -13,7 +13,7 @@ func TestGitHub_FetchRecipe_Integration_AgentsMD(t *testing.T) {
 	}
 	t.Parallel()
 	g := &GitHub{Strict: true}
-	exec, err := g.FetchRecipe("agents_md")
+	exec, err := g.FetchRecipe("docs_update")
 	require.NoError(t, err, "unexpected error fetching agents_md recipe from GitHub")
 	require.NotNil(t, exec)
 	require.NotNil(t, exec.GetRecipe())
@@ -21,5 +21,5 @@ func TestGitHub_FetchRecipe_Integration_AgentsMD(t *testing.T) {
 	assert.NotNil(t, rec.GetIde())
 	assert.NotNil(t, rec.GetContext())
 	assert.Nil(t, rec.GetPrefetch())
-	assert.Equal(t, "agents_md", exec.GetEntryPoint().GetStart().GetCommand())
+	assert.Equal(t, "docs_update_run", exec.GetEntryPoint().GetStart().GetCommand())
 }

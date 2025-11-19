@@ -23,13 +23,15 @@ func (w *Workspace) Materialize(_ context.Context, ws *recipes.WorkspaceConfig) 
 	if ws == nil || !ws.GetEnabled() {
 		return "", nil
 	}
+	workspacePath := ws.GetPath()
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to get home directory: %w", err)
+	if !ws.GetAbsolute() {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to get home directory: %w", err)
+		}
+		workspacePath = filepath.Join(homeDir, ws.GetPath())
 	}
-
-	workspacePath := filepath.Join(homeDir, ws.GetPath())
 
 	if ws.HasUnique() {
 		unique := ws.GetUnique()

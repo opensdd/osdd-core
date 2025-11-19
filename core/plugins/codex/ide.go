@@ -16,9 +16,11 @@ import (
 //go:embed commands_rules.md
 var rules string
 
+var SettingsFolder = ".codex"
+
 func NewIDEProvider() providers.IDE {
 	sh := &shared.IDE{
-		CommandsFolder: ".codex/commands",
+		CommandsFolder: fmt.Sprintf("%v/commands", SettingsFolder),
 		Settings:       &settings{},
 	}
 	return &provider{shared: sh}
@@ -35,7 +37,7 @@ func (p *provider) Materialize(ctx context.Context, genCtx *core.GenerationConte
 	}
 	if len(ide.GetCommands().GetEntries()) > 0 {
 		result.SetEntries(append(result.GetEntries(), osdd.MaterializedResult_Entry_builder{
-			File: osdd.FullFileContent_builder{Path: ".codex/__commands_rules__.md", Content: rules}.Build(),
+			File: osdd.FullFileContent_builder{Path: fmt.Sprintf("%v/__commands_rules__.md", SettingsFolder), Content: rules}.Build(),
 		}.Build()))
 	}
 	return result, nil
@@ -79,7 +81,7 @@ func (p *provider) getCustomPrompt(genCtx *core.GenerationContext) (string, bool
 		return "", false
 	}
 	omitDefaultPrompt := false
-	promptPref := "Read and remember .codex/__commands_rules__.md."
+	promptPref := fmt.Sprintf("Read and remember %v/__commands_rules__.md.", SettingsFolder)
 	st := genCtx.ExecRecipe.GetEntryPoint().GetStart()
 	switch st.WhichType() {
 	case recipes.StartConfig_Command_case:

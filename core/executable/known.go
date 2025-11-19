@@ -24,7 +24,7 @@ const (
 	Codex     IDE = "codex"
 )
 
-func getJetbrainsIDEs() []IDE {
+func GetJetbrainsIDEs() []IDE {
 	return []IDE{
 		PyCharm,
 		IntelliJ,
@@ -40,7 +40,7 @@ func getJetbrainsIDEs() []IDE {
 }
 
 func getKnown() []IDE {
-	return append(getJetbrainsIDEs(), CursorCLI, Cursor, Windsurf, Claude, Codex)
+	return append(GetJetbrainsIDEs(), CursorCLI, Cursor, Windsurf, Claude, Codex)
 }
 
 func asIDE(ide string) (IDE, error) {

@@ -7,6 +7,7 @@ import (
 	"github.com/opensdd/osdd-core/core/plugins/claude"
 	"github.com/opensdd/osdd-core/core/plugins/codex"
 	"github.com/opensdd/osdd-core/core/plugins/cursorcli"
+	"github.com/opensdd/osdd-core/core/plugins/junie"
 	"github.com/opensdd/osdd-core/core/providers"
 )
 
@@ -21,6 +22,11 @@ func getIDE(ideType string) (providers.IDE, error) {
 		return cursorcli.NewIDEProvider(), nil
 	case "codex":
 		return codex.NewIDEProvider(), nil
+	}
+	for _, jb := range GetJetbrainsIDEs() {
+		if strings.EqualFold(string(jb), ideType) {
+			return junie.NewIDEProvider(), nil
+		}
 	}
 	return nil, fmt.Errorf("unsupported IDE type: [%v]", ideType)
 }

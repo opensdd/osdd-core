@@ -6,6 +6,7 @@ import (
 
 	"github.com/opensdd/osdd-core/core/plugins/claude"
 	"github.com/opensdd/osdd-core/core/plugins/codex"
+	"github.com/opensdd/osdd-core/core/plugins/cursor"
 	"github.com/opensdd/osdd-core/core/plugins/cursorcli"
 	"github.com/opensdd/osdd-core/core/plugins/junie"
 	"github.com/opensdd/osdd-core/core/providers"
@@ -20,6 +21,8 @@ func getIDE(ideType string) (providers.IDE, error) {
 		return claude.NewIDEProvider(), nil
 	case "cursor-cli":
 		return cursorcli.NewIDEProvider(), nil
+	case "cursor":
+		return cursor.NewIDEProvider(), nil
 	case "codex":
 		return codex.NewIDEProvider(), nil
 	}

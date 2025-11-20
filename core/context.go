@@ -13,6 +13,9 @@ type GenerationContext struct {
 	IDE string
 
 	ExecRecipe *recipes.ExecutableRecipe
+
+	// OutputCMDOnly indicates whether the generator should only output the command to be executed but not execute it.
+	OutputCMDOnly bool
 }
 
 func (g *GenerationContext) GetPrefetched() map[string]*osdd.FetchedData {

@@ -1,6 +1,7 @@
 package executable
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,42 +11,58 @@ import (
 	"strings"
 )
 
+type LaunchResult struct {
+	// ToExecute is the command to execute in the terminal. If provided, then actual execution was skipped.
+	ToExecute string
+	Skipped   bool
+}
+
+type LaunchParams struct {
+	IDE           string
+	RepoPath      string
+	Args          []string
+	OutputCMDOnly bool
+}
+
 // LaunchIDE launches the specified IDE at the given repository path
-func LaunchIDE(ide string, repoPath string, args []string) (bool, error) {
-	ideType, err := asIDE(ide)
+func LaunchIDE(ctx context.Context, params LaunchParams) (LaunchResult, error) {
+	ideType, err := asIDE(params.IDE)
 	if err != nil {
-		return false, err
+		return LaunchResult{}, err
 	}
 	installed, err := detectInstalledIDEs()
 	if err != nil {
-		return false, fmt.Errorf("failed to detect installed IDEs: %w", err)
+		return LaunchResult{}, fmt.Errorf("failed to detect installed IDEs: %w", err)
 	}
-	return launchWithPath(installed[ideType], repoPath, args)
+	return launchWithPath(ctx, installed[ideType], params)
 }
 
-func launchWithPath(idePath string, repoPath string, args []string) (bool, error) {
+func launchWithPath(ctx context.Context, idePath string, params LaunchParams) (LaunchResult, error) {
 	if _, err := os.Stat(idePath); os.IsNotExist(err) {
-		return false, fmt.Errorf("IDE executable not found at %s", idePath)
+		return LaunchResult{}, fmt.Errorf("IDE executable not found at %s", idePath)
 	}
 
-	if _, err := os.Stat(repoPath); os.IsNotExist(err) {
-		return false, fmt.Errorf("repository path not found at %s", repoPath)
+	if _, err := os.Stat(params.RepoPath); os.IsNotExist(err) {
+		return LaunchResult{}, fmt.Errorf("repository path not found at %s", params.RepoPath)
 	}
 
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin", "linux", "windows":
 		if isTerminalExecutable(idePath) {
-			return launchInTerminal(idePath, repoPath, args)
+			return launchInTerminal(ctx, idePath, params)
 		}
-		cmd = exec.Command(idePath, repoPath)
+		if params.OutputCMDOnly {
+			return LaunchResult{ToExecute: fmt.Sprintf("%v %v", idePath, params.RepoPath)}, nil
+		}
+		cmd = exec.CommandContext(ctx, idePath, params.RepoPath)
 	default:
-		return false, fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
+		return LaunchResult{}, fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
 	}
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	return true, cmd.Start()
+	return LaunchResult{}, cmd.Start()
 }
 
 var executableAgents = []string{
@@ -60,23 +77,26 @@ func isTerminalExecutable(idePath string) bool {
 }
 
 // launchInTerminal launches CLI IDE in a new terminal session
-func launchInTerminal(idePath string, repoPath string, args []string) (bool, error) {
+func launchInTerminal(ctx context.Context, idePath string, params LaunchParams) (LaunchResult, error) {
+	extraArgs := getExtraLaunchParams(idePath)
+	allArgs := append(extraArgs, params.Args...)
+	extra := ""
+	if len(allArgs) > 0 {
+		extra = " " + strings.Join(allArgs, " ")
+	}
+	toExecute := fmt.Sprintf("cd '%s' && '%s'%v", params.RepoPath, idePath, extra)
+	if params.OutputCMDOnly {
+		return LaunchResult{ToExecute: toExecute}, nil
+	}
+
 	switch runtime.GOOS {
 	case "darwin":
-		extraArgs := getExtraLaunchParams(idePath)
-		allArgs := append(extraArgs, args...)
-		extra := ""
-		if len(allArgs) > 0 {
-			extra = " " + strings.Join(allArgs, " ")
-		}
-		script := fmt.Sprintf(
-			`tell application "Terminal" to do script "cd '%s' && '%s'%v"`, repoPath, idePath, extra)
-		cmd := exec.Command("osascript", "-e", script)
-		err := cmd.Start()
-		return true, err
+		script := fmt.Sprintf(`tell application "Terminal" to do script "%v"`, toExecute)
+		cmd := exec.CommandContext(ctx, "osascript", "-e", script)
+		return LaunchResult{}, cmd.Start()
 	default:
-		fmt.Printf("Only MacOS is supported for direct execution of CLIs. Please start manually:\n  cd \"%s\" && %v\n", repoPath, idePath)
-		return false, nil
+		fmt.Printf("Only MacOS is supported for direct execution of CLIs. Please start manually:\n  %v\n", toExecute)
+		return LaunchResult{Skipped: true}, nil
 	}
 }
 

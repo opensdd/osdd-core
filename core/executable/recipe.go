@@ -10,6 +10,11 @@ import (
 	"github.com/opensdd/osdd-core/core/providers"
 )
 
+type RecipeExecutionResult struct {
+	// LaunchResult is the result of launching the IDE.
+	LaunchResult LaunchResult
+}
+
 func ForRecipe(recipe *recipes.ExecutableRecipe) *Recipe {
 	return &Recipe{recipe: recipe}
 }
@@ -50,9 +55,9 @@ func (r *Recipe) Materialize(ctx context.Context, genCtx *core.GenerationContext
 }
 
 // Execute start a recipe in the specified AI-IDE with a specified start command.
-func (r *Recipe) Execute(ctx context.Context, genCtx *core.GenerationContext) error {
+func (r *Recipe) Execute(ctx context.Context, genCtx *core.GenerationContext) (RecipeExecutionResult, error) {
 	if r.materialized == nil {
-		return fmt.Errorf("recipe must be materialized first")
+		return RecipeExecutionResult{}, fmt.Errorf("recipe must be materialized first")
 	}
 	root := r.materialized.GetWorkspacePath()
 	if root == "" {
@@ -60,12 +65,12 @@ func (r *Recipe) Execute(ctx context.Context, genCtx *core.GenerationContext) er
 	}
 	// Persist materialized files into the workspace so the IDE can use them.
 	if err := core.PersistMaterializedResult(context.Background(), root, r.materialized); err != nil {
-		return fmt.Errorf("failed to persist materialized result: %w", err)
+		return RecipeExecutionResult{}, fmt.Errorf("failed to persist materialized result: %w", err)
 	}
 	ideType := r.recipe.GetEntryPoint().GetIdeType()
 	execProps, err := r.ide.PrepareStart(ctx, genCtx)
 	if err != nil {
-		return fmt.Errorf("failed to prepare start: %w", err)
+		return RecipeExecutionResult{}, fmt.Errorf("failed to prepare start: %w", err)
 	}
 	prompt := execProps.PromptPrefix
 	if !execProps.OmitDefaultPrompt {
@@ -76,11 +81,16 @@ func (r *Recipe) Execute(ctx context.Context, genCtx *core.GenerationContext) er
 		args = append(args, fmt.Sprintf(`'%v'`, prompt))
 	}
 
-	_, err = LaunchIDE(ideType, root, args)
+	launchResult, err := LaunchIDE(ctx, LaunchParams{
+		IDE:           ideType,
+		RepoPath:      root,
+		Args:          args,
+		OutputCMDOnly: genCtx.OutputCMDOnly,
+	})
 	if err != nil {
-		return fmt.Errorf("failed to launch IDE: %w", err)
+		return RecipeExecutionResult{}, fmt.Errorf("failed to launch IDE: %w", err)
 	}
-	return nil
+	return RecipeExecutionResult{LaunchResult: launchResult}, nil
 }
 
 func getPrompt(st *recipes.StartConfig) string {

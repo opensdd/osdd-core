@@ -116,7 +116,6 @@ func launchInTerminal(ctx context.Context, idePath string, params LaunchParams) 
 	switch runtime.GOOS {
 	case "darwin":
 		script := fmt.Sprintf(`tell application "Terminal" to do script "%v"`, toExecute)
-		fmt.Printf("Launching IDE in a new terminal session:\n  %v\n", script)
 		cmd := exec.CommandContext(ctx, "osascript", "-e", script)
 		return LaunchResult{}, cmd.Start()
 	default:

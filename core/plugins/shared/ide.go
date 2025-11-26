@@ -297,15 +297,22 @@ func buildMcpJSON(mcp *recipes.Mcp, existingContent string) (string, error) {
 			if s.GetStdio() != nil {
 				srv.Type = "stdio"
 				cmd := s.GetStdio().GetCommand()
+				args := s.GetStdio().GetArgs()
 				// Split command into the executable and args by whitespace
 				if cmd != "" {
-					parts := strings.Fields(cmd)
-					if len(parts) > 0 {
-						srv.Command = parts[0]
-						if len(parts) > 1 {
-							srv.Args = parts[1:]
+					if len(args) > 0 {
+						srv.Args = args
+						srv.Command = cmd
+					} else {
+						parts := strings.Fields(cmd)
+						if len(parts) > 0 {
+							srv.Command = parts[0]
+							if len(parts) > 1 {
+								srv.Args = parts[1:]
+							}
 						}
 					}
+
 				}
 				// Always include an env object for stdio servers
 				srv.Env = map[string]string{}

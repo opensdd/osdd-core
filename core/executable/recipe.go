@@ -78,7 +78,7 @@ func (r *Recipe) Execute(ctx context.Context, genCtx *core.GenerationContext) (R
 	}
 	args := execProps.ExtraArgs
 	if prompt != "" {
-		args = append(args, fmt.Sprintf(`'%v'`, prompt))
+		args = append(args, prompt)
 	}
 
 	launchResult, err := LaunchIDE(ctx, LaunchParams{

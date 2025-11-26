@@ -2,9 +2,9 @@ package codex
 
 import (
 	"context"
-	"fmt"
-
 	_ "embed"
+	"encoding/json"
+	"fmt"
 
 	"github.com/opensdd/osdd-api/clients/go/osdd"
 	"github.com/opensdd/osdd-api/clients/go/osdd/recipes"
@@ -72,6 +72,22 @@ func (p *provider) getExtraArgs(genCtx *core.GenerationContext) []string {
 	}
 	if networkAllowed {
 		result = append(result, "--config", "sandbox_workspace_write.network_access='true'")
+	}
+	for name, srv := range genCtx.ExecRecipe.GetRecipe().GetIde().GetMcp().GetServers() {
+		switch srv.WhichType() {
+		case recipes.McpServer_Http_case:
+			result = append(result, "--config", fmt.Sprintf("mcp_servers.%v.url='%v'", name, srv.GetHttp().GetUrl()))
+		case recipes.McpServer_Stdio_case:
+			stdio := srv.GetStdio()
+			result = append(result, "--config", fmt.Sprintf("mcp_servers.%v.command=\"%v\"", name, stdio.GetCommand()))
+			if args := stdio.GetArgs(); len(args) > 0 {
+				out, _ := json.Marshal(args)
+				if len(out) > 0 {
+					result = append(result, "--config", fmt.Sprintf("mcp_servers.%v.args=%v", name, string(out)))
+				}
+
+			}
+		}
 	}
 	return result
 }

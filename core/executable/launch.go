@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -76,22 +77,46 @@ func isTerminalExecutable(idePath string) bool {
 	return slices.Contains(executableAgents, execName)
 }
 
+func quoteSingle(s string) string {
+	// Escape any single quotes in the string by replacing ' with '\''
+	escaped := strings.ReplaceAll(s, "\"", "\\\"")
+	return "'" + escaped + "'"
+}
+
 // launchInTerminal launches CLI IDE in a new terminal session
 func launchInTerminal(ctx context.Context, idePath string, params LaunchParams) (LaunchResult, error) {
 	extraArgs := getExtraLaunchParams(idePath)
 	allArgs := append(extraArgs, params.Args...)
-	extra := ""
-	if len(allArgs) > 0 {
-		extra = " " + strings.Join(allArgs, " ")
-	}
-	toExecute := fmt.Sprintf("cd '%s' && '%s'%v", params.RepoPath, idePath, extra)
 	if params.OutputCMDOnly {
+		extra := ""
+		if len(allArgs) > 0 {
+			for _, arg := range allArgs {
+				extra += " "
+				extra += strconv.Quote(arg)
+			}
+		}
+		toExecute := fmt.Sprintf("cd '%s' && '%s'%v", params.RepoPath, idePath, extra)
 		return LaunchResult{ToExecute: toExecute}, nil
 	}
+	//extra := ""
+	//if len(allArgs) > 0 {
+	//	extra = " " + strings.Join(allArgs, " ")
+	//}
+	//toExecute := fmt.Sprintf("cd '%s' && '%s'%v", params.RepoPath, idePath, extra)
+
+	extra := ""
+	if len(allArgs) > 0 {
+		for _, arg := range allArgs {
+			extra += " "
+			extra += quoteSingle(arg)
+		}
+	}
+	toExecute := fmt.Sprintf("cd '%s' && '%s'%v", params.RepoPath, idePath, extra)
 
 	switch runtime.GOOS {
 	case "darwin":
 		script := fmt.Sprintf(`tell application "Terminal" to do script "%v"`, toExecute)
+		fmt.Printf("Launching IDE in a new terminal session:\n  %v\n", script)
 		cmd := exec.CommandContext(ctx, "osascript", "-e", script)
 		return LaunchResult{}, cmd.Start()
 	default:

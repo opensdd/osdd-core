@@ -80,9 +80,9 @@ func (r *Recipe) Execute(ctx context.Context, genCtx *core.GenerationContext) (R
 	if prompt != "" {
 		args = append(args, prompt)
 	}
-
 	launchResult, err := LaunchIDE(ctx, LaunchParams{
 		IDE:           ideType,
+		IDEPath:       genCtx.IDEPaths[ideType],
 		RepoPath:      root,
 		Args:          args,
 		OutputCMDOnly: genCtx.OutputCMDOnly,

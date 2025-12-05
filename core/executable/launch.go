@@ -10,18 +10,23 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/opensdd/osdd-api/clients/go/osdd"
+	"github.com/opensdd/osdd-api/clients/go/osdd/recipes"
 )
 
 type LaunchResult struct {
 	// ToExecute is the command to execute in the terminal. If provided, then actual execution was skipped.
-	ToExecute string
-	Skipped   bool
+	ToExecute     string
+	Skipped       bool
+	LaunchDetails *recipes.LaunchDetails
 }
 
 type LaunchParams struct {
 	IDE           string
 	RepoPath      string
 	Args          []string
+	IDEPath       string
 	OutputCMDOnly bool
 }
 
@@ -31,18 +36,22 @@ func LaunchIDE(ctx context.Context, params LaunchParams) (LaunchResult, error) {
 	if err != nil {
 		return LaunchResult{}, err
 	}
-	installed, err := detectInstalledIDEs()
-	if err != nil {
-		return LaunchResult{}, fmt.Errorf("failed to detect installed IDEs: %w", err)
+	idePath := params.IDEPath
+	if idePath == "" {
+		installed, err := detectInstalledIDEs()
+		if err != nil {
+			return LaunchResult{}, fmt.Errorf("failed to detect installed IDEs: %w", err)
+		}
+		idePath = installed[ideType]
+		if _, err := os.Stat(idePath); os.IsNotExist(err) {
+			return LaunchResult{}, fmt.Errorf("IDE executable not found at %s", idePath)
+		}
 	}
-	return launchWithPath(ctx, installed[ideType], params)
+
+	return launchWithPath(ctx, idePath, params)
 }
 
 func launchWithPath(ctx context.Context, idePath string, params LaunchParams) (LaunchResult, error) {
-	if _, err := os.Stat(idePath); os.IsNotExist(err) {
-		return LaunchResult{}, fmt.Errorf("IDE executable not found at %s", idePath)
-	}
-
 	if _, err := os.Stat(params.RepoPath); os.IsNotExist(err) {
 		return LaunchResult{}, fmt.Errorf("repository path not found at %s", params.RepoPath)
 	}
@@ -54,7 +63,12 @@ func launchWithPath(ctx context.Context, idePath string, params LaunchParams) (L
 			return launchInTerminal(ctx, idePath, params)
 		}
 		if params.OutputCMDOnly {
-			return LaunchResult{ToExecute: fmt.Sprintf("%v %v", idePath, params.RepoPath)}, nil
+			return LaunchResult{
+				ToExecute: fmt.Sprintf("%v %v", idePath, params.RepoPath),
+				LaunchDetails: recipes.LaunchDetails_builder{
+					Cmd: osdd.Exec_builder{Cmd: idePath, Args: append([]string{params.RepoPath}, params.Args...)}.Build(),
+				}.Build(),
+			}, nil
 		}
 		cmd = exec.CommandContext(ctx, idePath, params.RepoPath)
 	default:
@@ -95,8 +109,12 @@ func launchInTerminal(ctx context.Context, idePath string, params LaunchParams) 
 				extra += strconv.Quote(arg)
 			}
 		}
+		launchDetails := recipes.LaunchDetails_builder{
+			Cmd: osdd.Exec_builder{Cmd: idePath, Args: allArgs}.Build(),
+			Dir: params.RepoPath,
+		}.Build()
 		toExecute := fmt.Sprintf("cd '%s' && '%s'%v", params.RepoPath, idePath, extra)
-		return LaunchResult{ToExecute: toExecute}, nil
+		return LaunchResult{ToExecute: toExecute, LaunchDetails: launchDetails}, nil
 	}
 	//extra := ""
 	//if len(allArgs) > 0 {

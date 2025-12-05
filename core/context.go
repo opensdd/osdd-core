@@ -12,6 +12,8 @@ type GenerationContext struct {
 	// IDE for which the recipe is being generated.
 	IDE string
 
+	IDEPaths map[string]string
+
 	ExecRecipe *recipes.ExecutableRecipe
 
 	// OutputCMDOnly indicates whether the generator should only output the command to be executed but not execute it.

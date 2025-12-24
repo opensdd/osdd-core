@@ -55,7 +55,10 @@ func (p *provider) PrepareStart(_ context.Context, genCtx *core.GenerationContex
 func (p *provider) getExtraArgs(genCtx *core.GenerationContext) []string {
 	var result []string
 	if genCtx.ExecRecipe.GetEntryPoint().GetWorkspace().GetEnabled() {
-		result = append(result, "--full-auto")
+		result = append(result,
+			"--full-auto",
+			"--config", "sandbox_mode=\"danger-full-access\"",
+		)
 	}
 	networkAllowed := false
 	for _, a := range genCtx.ExecRecipe.GetRecipe().GetIde().GetPermissions().GetAllow() {

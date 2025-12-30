@@ -121,6 +121,7 @@ func buildClaudeSettingsJSON(perms *recipes.Permissions, mcpServerNames []string
 	for _, name := range commandNames {
 		if name != "" {
 			cmdAllow = append(cmdAllow, fmt.Sprintf("SlashCommand(/%s)", name))
+			cmdAllow = append(cmdAllow, fmt.Sprintf("Skill(%s)", name))
 		}
 	}
 	newAllow = append(newAllow, cmdAllow...)

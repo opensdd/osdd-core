@@ -3,7 +3,7 @@ module github.com/opensdd/osdd-core
 go 1.25
 
 require (
-	github.com/opensdd/osdd-api/clients/go v0.5.9
+	github.com/opensdd/osdd-api/clients/go v0.6.0
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/protobuf v1.36.10
 	gopkg.in/yaml.v3 v3.0.1

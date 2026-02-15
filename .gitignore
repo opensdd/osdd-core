@@ -30,3 +30,4 @@ go.work.sum
 /.idea/modules.xml
 /.idea/osdd-core.iml
 /.idea/vcs.xml
+/.idea/go.imports.xml

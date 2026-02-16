@@ -1,8 +1,10 @@
 package generators
 
 import (
+	"bytes"
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -250,4 +252,100 @@ func TestContext_IntegrationTest_Combined_LocalFileItem(t *testing.T) {
 	file := entry.GetFile()
 	assert.Equal(t, "combined.txt", file.GetPath())
 	assert.Equal(t, "prefix:"+fileContent+":suffix", file.GetContent())
+}
+
+func TestContext_IntegrationTest_GitRepoSource(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	t.Parallel()
+	c := &Context{}
+
+	workspace := t.TempDir()
+
+	ctx := recipes.Context_builder{
+		Entries: []*recipes.ContextEntry{
+			recipes.ContextEntry_builder{
+				Path: "checkout",
+				From: recipes.ContextFrom_builder{
+					GitRepo: osdd.GitRepository_builder{
+						FullName: "opensdd/osdd-api",
+						Provider: "github",
+					}.Build(),
+				}.Build(),
+			}.Build(),
+		},
+	}.Build()
+
+	genCtx := &core.GenerationContext{WorkspacePath: workspace}
+	result, err := c.Materialize(context.Background(), ctx, genCtx)
+	require.NoError(t, err, "unexpected error cloning git repository")
+	require.Len(t, result.GetEntries(), 1)
+
+	entry := result.GetEntries()[0]
+	require.True(t, entry.HasDirectory(), "expected a Directory entry")
+	assert.Equal(t, "checkout", entry.GetDirectory())
+
+	// Verify the clone directory exists and has a .git folder.
+	clonedPath := filepath.Join(workspace, "checkout")
+	info, err := os.Stat(filepath.Join(clonedPath, ".git"))
+	require.NoError(t, err, ".git directory should exist in cloned repo")
+	assert.True(t, info.IsDir())
+}
+
+func TestContext_IntegrationTest_GitRepoWithGhAuth(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	// Skip if gh CLI is not installed.
+	if _, err := exec.LookPath("gh"); err != nil {
+		t.Skip("gh CLI not installed, skipping authenticated git clone test")
+	}
+
+	// Get a token from gh auth.
+	var tokenBuf bytes.Buffer
+	ghCmd := exec.Command("gh", "auth", "token")
+	ghCmd.Stdout = &tokenBuf
+	if err := ghCmd.Run(); err != nil {
+		t.Skipf("gh auth token failed (not logged in?): %v", err)
+	}
+	token := strings.TrimSpace(tokenBuf.String())
+	if token == "" {
+		t.Skip("gh auth token returned empty token")
+	}
+
+	t.Setenv("OSDD_TEST_GH_TOKEN", token)
+
+	c := &Context{}
+	workspace := t.TempDir()
+
+	ctx := recipes.Context_builder{
+		Entries: []*recipes.ContextEntry{
+			recipes.ContextEntry_builder{
+				Path: "auth-checkout",
+				From: recipes.ContextFrom_builder{
+					GitRepo: osdd.GitRepository_builder{
+						FullName:        "opensdd/osdd-api",
+						Provider:        "github",
+						AuthTokenEnvVar: strPtr("OSDD_TEST_GH_TOKEN"),
+					}.Build(),
+				}.Build(),
+			}.Build(),
+		},
+	}.Build()
+
+	genCtx := &core.GenerationContext{WorkspacePath: workspace}
+	result, err := c.Materialize(context.Background(), ctx, genCtx)
+	require.NoError(t, err, "unexpected error cloning with gh auth token")
+	require.Len(t, result.GetEntries(), 1)
+
+	entry := result.GetEntries()[0]
+	require.True(t, entry.HasDirectory(), "expected a Directory entry")
+	assert.Equal(t, "auth-checkout", entry.GetDirectory())
+
+	clonedPath := filepath.Join(workspace, "auth-checkout")
+	info, err := os.Stat(filepath.Join(clonedPath, ".git"))
+	require.NoError(t, err, ".git directory should exist in cloned repo")
+	assert.True(t, info.IsDir())
 }

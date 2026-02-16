@@ -3,7 +3,9 @@ package generators
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -54,6 +56,11 @@ func (c *Context) materializeEntry(ctx context.Context, entry *recipes.ContextEn
 		return nil, fmt.Errorf("entry must have a 'from' source")
 	}
 
+	// GitRepo entries clone a full repository to disk and return a Directory entry.
+	if entry.GetFrom().WhichType() == recipes.ContextFrom_GitRepo_case {
+		return c.materializeGitRepo(ctx, entry, genCtx)
+	}
+
 	content, err := c.fetchContent(ctx, entry.GetFrom(), genCtx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch content: %w", err)
@@ -64,6 +71,24 @@ func (c *Context) materializeEntry(ctx context.Context, entry *recipes.ContextEn
 			Path:    path,
 			Content: content,
 		}.Build(),
+	}.Build(), nil
+}
+
+func (c *Context) materializeGitRepo(ctx context.Context, entry *recipes.ContextEntry, genCtx *core.GenerationContext) (*osdd.MaterializedResult_Entry, error) {
+	path := entry.GetPath()
+	slog.Debug("Materializing git repository context", "path", path)
+
+	destPath := path
+	if genCtx != nil && genCtx.WorkspacePath != "" {
+		destPath = filepath.Join(genCtx.WorkspacePath, path)
+	}
+
+	if err := utils.CloneGitRepo(ctx, entry.GetFrom().GetGitRepo(), destPath); err != nil {
+		return nil, fmt.Errorf("failed to clone git repository: %w", err)
+	}
+
+	return osdd.MaterializedResult_Entry_builder{
+		Directory: &path,
 	}.Build(), nil
 }
 

@@ -11,13 +11,14 @@ import (
 	"github.com/opensdd/osdd-api/clients/go/osdd"
 )
 
-// PersistMaterializedResult writes all file entries from MaterializedResult into the filesystem under the given root directory.
+// PersistMaterializedResult writes all entries from MaterializedResult into the filesystem under the given root directory.
 // - root: base directory where files will be written.
 // - result: materialized content to persist.
 // Behavior:
 // - Creates parent directories as needed (0755 perms).
 // - Overwrites existing files (0644 perms).
-// - Skips entries that do not contain a file.
+// - Handles Directory entries by ensuring the directory exists under root.
+// - Skips entries that contain neither a file nor a directory.
 // - Rejects paths that escape the provided root via path traversal.
 func PersistMaterializedResult(_ context.Context, root string, result *osdd.MaterializedResult) error {
 	log := slog.With("op", "PersistMaterializedResult")
@@ -36,7 +37,31 @@ func PersistMaterializedResult(_ context.Context, root string, result *osdd.Mate
 	}
 
 	for i, e := range entries {
-		if e == nil || !e.HasFile() {
+		if e == nil {
+			continue
+		}
+
+		// Handle Directory entries: ensure the directory exists under root.
+		if e.HasDirectory() {
+			dirPath := strings.TrimSpace(e.GetDirectory())
+			if dirPath != "" {
+				rel := filepath.Clean(dirPath)
+				if filepath.IsAbs(rel) {
+					rel = strings.TrimPrefix(rel, string(os.PathSeparator))
+				}
+				full := filepath.Clean(filepath.Join(root, rel))
+				if !isPathWithinRoot(root, full) {
+					return fmt.Errorf("entry %d: directory path escapes root: %s", i, dirPath)
+				}
+				log.Debug("Ensuring directory exists", "dir", full)
+				if err := os.MkdirAll(full, 0o755); err != nil {
+					return fmt.Errorf("entry %d: failed to create directory %s: %w", i, full, err)
+				}
+			}
+			continue
+		}
+
+		if !e.HasFile() {
 			continue
 		}
 		f := e.GetFile()

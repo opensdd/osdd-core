@@ -41,6 +41,7 @@ func (r *Recipe) Materialize(ctx context.Context, genCtx *core.GenerationContext
 	if err != nil {
 		return nil, fmt.Errorf("failed to materialize workspace: %w", err)
 	}
+	genCtx.WorkspacePath = wsPath
 	recipeResult, err := rec.Materialize(ctx, genCtx, r.recipe.GetRecipe())
 	if err != nil {
 		return nil, fmt.Errorf("failed to materialize recipe: %w", err)

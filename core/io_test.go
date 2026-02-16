@@ -97,4 +97,52 @@ func TestPersistMaterializedResult(t *testing.T) {
 		// should not error
 		require.NoError(t, PersistMaterializedResult(context.Background(), root, res))
 	})
+
+	t.Run("directory_entry", func(t *testing.T) {
+		t.Parallel()
+		root := t.TempDir()
+		dirPath := "my-repo"
+		res := osdd.MaterializedResult_builder{
+			Entries: []*osdd.MaterializedResult_Entry{
+				osdd.MaterializedResult_Entry_builder{Directory: &dirPath}.Build(),
+			},
+		}.Build()
+
+		require.NoError(t, PersistMaterializedResult(context.Background(), root, res))
+
+		info, err := os.Stat(filepath.Join(root, dirPath))
+		require.NoError(t, err)
+		assert.True(t, info.IsDir(), "expected directory to be created")
+	})
+
+	t.Run("directory_entry_nested", func(t *testing.T) {
+		t.Parallel()
+		root := t.TempDir()
+		dirPath := filepath.Join("a", "b", "c")
+		res := osdd.MaterializedResult_builder{
+			Entries: []*osdd.MaterializedResult_Entry{
+				osdd.MaterializedResult_Entry_builder{Directory: &dirPath}.Build(),
+			},
+		}.Build()
+
+		require.NoError(t, PersistMaterializedResult(context.Background(), root, res))
+
+		info, err := os.Stat(filepath.Join(root, dirPath))
+		require.NoError(t, err)
+		assert.True(t, info.IsDir(), "expected nested directory to be created")
+	})
+
+	t.Run("directory_path_traversal_blocked", func(t *testing.T) {
+		root := t.TempDir()
+		dirPath := filepath.Join("..", "escaped")
+		res := osdd.MaterializedResult_builder{
+			Entries: []*osdd.MaterializedResult_Entry{
+				osdd.MaterializedResult_Entry_builder{Directory: &dirPath}.Build(),
+			},
+		}.Build()
+
+		err := PersistMaterializedResult(context.Background(), root, res)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "directory path escapes root")
+	})
 }

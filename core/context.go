@@ -18,6 +18,9 @@ type GenerationContext struct {
 
 	// OutputCMDOnly indicates whether the generator should only output the command to be executed but not execute it.
 	OutputCMDOnly bool
+
+	// WorkspacePath is the resolved workspace root directory for materialization.
+	WorkspacePath string
 }
 
 func (g *GenerationContext) GetPrefetched() map[string]*osdd.FetchedData {

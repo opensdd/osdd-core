@@ -559,3 +559,66 @@ func TestContext_Materialize_Combined_UserInput_MissingRequired(t *testing.T) {
 	assert.Contains(t, err.Error(), "missing required user input parameters")
 	assert.Contains(t, err.Error(), "REQ2")
 }
+
+// --- GitRepo context tests ---
+
+func gitRepoFrom(fullName, provider string, authEnvVar *string) *recipes.ContextFrom {
+	return recipes.ContextFrom_builder{
+		GitRepo: osdd.GitRepository_builder{
+			FullName:        fullName,
+			Provider:        provider,
+			AuthTokenEnvVar: authEnvVar,
+		}.Build(),
+	}.Build()
+}
+
+func TestContext_MaterializeEntry_GitRepo_EmptyFullNameError(t *testing.T) {
+	t.Parallel()
+	c := &Context{}
+
+	entry := recipes.ContextEntry_builder{
+		Path: "repo",
+		From: gitRepoFrom("", "github", nil),
+	}.Build()
+
+	_, err := c.materializeEntry(context.Background(), entry, &core.GenerationContext{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to clone git repository")
+	assert.Contains(t, err.Error(), "git repository full name cannot be empty")
+}
+
+func TestContext_MaterializeEntry_GitRepo_CloneFailure(t *testing.T) {
+	t.Parallel()
+	c := &Context{}
+
+	dest := t.TempDir()
+	entry := recipes.ContextEntry_builder{
+		Path: "repo-clone",
+		From: gitRepoFrom("nonexistent/repo-that-does-not-exist-99999", "github", nil),
+	}.Build()
+
+	genCtx := &core.GenerationContext{WorkspacePath: dest}
+	_, err := c.materializeEntry(context.Background(), entry, genCtx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to clone git repository")
+	assert.Contains(t, err.Error(), "git clone failed")
+}
+
+func TestContext_Materialize_GitRepo_ErrorPropagation(t *testing.T) {
+	t.Parallel()
+	c := &Context{}
+
+	ctx := recipes.Context_builder{
+		Entries: []*recipes.ContextEntry{
+			recipes.ContextEntry_builder{
+				Path: "repo",
+				From: gitRepoFrom("", "github", nil),
+			}.Build(),
+		},
+	}.Build()
+
+	_, err := c.Materialize(context.Background(), ctx, &core.GenerationContext{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to materialize entry for path repo")
+	assert.Contains(t, err.Error(), "failed to clone git repository")
+}

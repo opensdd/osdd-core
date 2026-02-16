@@ -31,3 +31,7 @@ go.work.sum
 /.idea/osdd-core.iml
 /.idea/vcs.xml
 /.idea/go.imports.xml
+/.mcp.json
+/.claude/
+/.idea/
+/specs/

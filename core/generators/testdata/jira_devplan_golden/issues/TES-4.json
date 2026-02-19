@@ -1,0 +1,19 @@
+{
+  "key": "TES-4",
+  "fields": {
+    "summary": "Test Epic",
+    "description": null,
+    "status": {
+      "name": "Backlog"
+    },
+    "assignee": null,
+    "issuetype": {
+      "name": "Epic"
+    },
+    "priority": {
+      "name": "Medium"
+    },
+    "created": "2025-09-15T15:21:57.321-0700",
+    "updated": "2025-09-15T15:22:06.624-0700"
+  }
+}

@@ -2,6 +2,7 @@ package generators
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -34,11 +35,11 @@ func (c *Context) Materialize(ctx context.Context, contextMsg *recipes.Context, 
 		if len(ideFilter) > 0 && genCtx.IDE != "" && !slices.Contains(ideFilter, genCtx.IDE) {
 			continue
 		}
-		materializedEntry, err := c.materializeEntry(ctx, entry, genCtx)
+		materialized, err := c.materializeEntry(ctx, entry, genCtx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to materialize entry for path %s: %w", entry.GetPath(), err)
 		}
-		resultEntries = append(resultEntries, materializedEntry)
+		resultEntries = append(resultEntries, materialized...)
 	}
 
 	return osdd.MaterializedResult_builder{
@@ -46,7 +47,7 @@ func (c *Context) Materialize(ctx context.Context, contextMsg *recipes.Context, 
 	}.Build(), nil
 }
 
-func (c *Context) materializeEntry(ctx context.Context, entry *recipes.ContextEntry, genCtx *core.GenerationContext) (*osdd.MaterializedResult_Entry, error) {
+func (c *Context) materializeEntry(ctx context.Context, entry *recipes.ContextEntry, genCtx *core.GenerationContext) ([]*osdd.MaterializedResult_Entry, error) {
 	path := entry.GetPath()
 	if path == "" {
 		return nil, fmt.Errorf("entry path cannot be empty")
@@ -56,22 +57,84 @@ func (c *Context) materializeEntry(ctx context.Context, entry *recipes.ContextEn
 		return nil, fmt.Errorf("entry must have a 'from' source")
 	}
 
+	from := entry.GetFrom()
+
 	// GitRepo entries clone a full repository to disk and return a Directory entry.
-	if entry.GetFrom().WhichType() == recipes.ContextFrom_GitRepo_case {
-		return c.materializeGitRepo(ctx, entry, genCtx)
+	if from.WhichType() == recipes.ContextFrom_GitRepo_case {
+		e, err := c.materializeGitRepo(ctx, entry, genCtx)
+		if err != nil {
+			return nil, err
+		}
+		return []*osdd.MaterializedResult_Entry{e}, nil
 	}
 
-	content, err := c.fetchContent(ctx, entry.GetFrom(), genCtx)
+	// Jira/Linear entries produce multiple files: a summary index + one file per issue.
+	if from.WhichType() == recipes.ContextFrom_JiraIssues_case {
+		src := from.GetJiraIssues()
+		token := resolveAuthToken(src.GetAuthTokenEnvVar(), genCtx)
+		return c.materializeIssues(path, func() (*utils.IssuesResult, error) {
+			return utils.FetchJiraIssues(ctx, src, token)
+		})
+	}
+	if from.WhichType() == recipes.ContextFrom_LinearIssues_case {
+		src := from.GetLinearIssues()
+		token := resolveAuthToken(src.GetAuthTokenEnvVar(), genCtx)
+		return c.materializeIssues(path, func() (*utils.IssuesResult, error) {
+			return utils.FetchLinearIssues(ctx, src, token)
+		})
+	}
+
+	content, err := c.fetchContent(ctx, from, genCtx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch content: %w", err)
 	}
 
-	return osdd.MaterializedResult_Entry_builder{
-		File: osdd.FullFileContent_builder{
-			Path:    path,
-			Content: content,
+	return []*osdd.MaterializedResult_Entry{
+		osdd.MaterializedResult_Entry_builder{
+			File: osdd.FullFileContent_builder{
+				Path:    path,
+				Content: content,
+			}.Build(),
 		}.Build(),
-	}.Build(), nil
+	}, nil
+}
+
+// materializeIssues converts an IssuesResult into a summary file and per-issue files.
+// The summary is written to <path>.json; individual issues go to issues/<id>.json.
+func (c *Context) materializeIssues(path string, fetch func() (*utils.IssuesResult, error)) ([]*osdd.MaterializedResult_Entry, error) {
+	result, err := fetch()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch issues: %w", err)
+	}
+
+	summaryJSON, err := json.MarshalIndent(result.Summary, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal issues summary: %w", err)
+	}
+
+	entries := make([]*osdd.MaterializedResult_Entry, 0, 1+len(result.Issues))
+
+	// Summary file at <path>.json
+	summaryPath := path + ".json"
+	entries = append(entries, osdd.MaterializedResult_Entry_builder{
+		File: osdd.FullFileContent_builder{
+			Path:    summaryPath,
+			Content: string(summaryJSON),
+		}.Build(),
+	}.Build())
+
+	// Per-issue files at issues/<id>.json
+	for _, s := range result.Summary {
+		issuePath := "issues/" + s.ID + ".json"
+		entries = append(entries, osdd.MaterializedResult_Entry_builder{
+			File: osdd.FullFileContent_builder{
+				Path:    issuePath,
+				Content: result.Issues[s.ID],
+			}.Build(),
+		}.Build())
+	}
+
+	return entries, nil
 }
 
 func (c *Context) materializeGitRepo(ctx context.Context, entry *recipes.ContextEntry, genCtx *core.GenerationContext) (*osdd.MaterializedResult_Entry, error) {
@@ -83,7 +146,9 @@ func (c *Context) materializeGitRepo(ctx context.Context, entry *recipes.Context
 		destPath = filepath.Join(genCtx.WorkspacePath, path)
 	}
 
-	if err := utils.CloneGitRepo(ctx, entry.GetFrom().GetGitRepo(), destPath); err != nil {
+	repo := entry.GetFrom().GetGitRepo()
+	token := resolveAuthToken(repo.GetAuthTokenEnvVar(), genCtx)
+	if err := utils.CloneGitRepo(ctx, repo, destPath, token); err != nil {
 		return nil, fmt.Errorf("failed to clone git repository: %w", err)
 	}
 
@@ -197,4 +262,12 @@ func (c *Context) fetchCombinedItem(ctx context.Context, item *recipes.CombinedC
 	default:
 		return "", fmt.Errorf("unknown or unset combined item type")
 	}
+}
+
+// resolveAuthToken resolves an auth token env var name through genCtx.ResolveEnv.
+func resolveAuthToken(envVar string, genCtx *core.GenerationContext) string {
+	if envVar == "" {
+		return ""
+	}
+	return genCtx.ResolveEnv(envVar)
 }

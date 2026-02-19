@@ -2,6 +2,7 @@ package generators
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -89,6 +90,7 @@ func TestContext_Materialize(t *testing.T) {
 		{
 			name:    "nil entries",
 			context: recipes.Context_builder{}.Build(),
+			genCtx:  &core.GenerationContext{},
 			validate: func(t *testing.T, result *osdd.MaterializedResult) {
 				assert.NotNil(t, result)
 				assert.Empty(t, result.GetEntries())
@@ -97,6 +99,7 @@ func TestContext_Materialize(t *testing.T) {
 		{
 			name:    "empty entries",
 			context: recipes.Context_builder{Entries: []*recipes.ContextEntry{}}.Build(),
+			genCtx:  &core.GenerationContext{},
 			validate: func(t *testing.T, result *osdd.MaterializedResult) {
 				assert.NotNil(t, result)
 				assert.Empty(t, result.GetEntries())
@@ -145,9 +148,10 @@ func TestContext_MaterializeEntry(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &Context{}
-			_, err := c.materializeEntry(context.Background(), tt.entry, tt.genCtx)
+			entries, err := c.materializeEntry(context.Background(), tt.entry, tt.genCtx)
 
 			require.Error(t, err)
+			assert.Nil(t, entries)
 			assert.Contains(t, err.Error(), tt.wantErr)
 		})
 	}
@@ -425,7 +429,7 @@ func ExampleContext_Materialize() {
 		},
 	}.Build()
 
-	result, err := c.Materialize(context.Background(), ctx, nil)
+	result, err := c.Materialize(context.Background(), ctx, &core.GenerationContext{})
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
@@ -621,4 +625,186 @@ func TestContext_Materialize_GitRepo_ErrorPropagation(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to materialize entry for path repo")
 	assert.Contains(t, err.Error(), "failed to clone git repository")
+}
+
+// --- Jira issues context tests ---
+
+func jiraIssuesFrom(org string, projects []string, authEnvVar *string) *recipes.ContextFrom {
+	return recipes.ContextFrom_builder{
+		JiraIssues: recipes.JiraIssuesSource_builder{
+			Organization:    org,
+			Projects:        projects,
+			AuthTokenEnvVar: authEnvVar,
+		}.Build(),
+	}.Build()
+}
+
+func TestContext_MaterializeEntry_JiraIssues_EmptyOrg(t *testing.T) {
+	t.Parallel()
+	c := &Context{}
+	entry := recipes.ContextEntry_builder{
+		Path: "jira-issues",
+		From: jiraIssuesFrom("", nil, nil),
+	}.Build()
+	_, err := c.materializeEntry(context.Background(), entry, &core.GenerationContext{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "jira organization cannot be empty")
+}
+
+func TestContext_Materialize_JiraIssues_ErrorPropagation(t *testing.T) {
+	t.Parallel()
+	c := &Context{}
+
+	ctx := recipes.Context_builder{
+		Entries: []*recipes.ContextEntry{
+			recipes.ContextEntry_builder{
+				Path: "jira-issues",
+				From: jiraIssuesFrom("", nil, nil),
+			}.Build(),
+		},
+	}.Build()
+
+	_, err := c.Materialize(context.Background(), ctx, &core.GenerationContext{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to materialize entry for path jira-issues")
+	assert.Contains(t, err.Error(), "jira organization cannot be empty")
+}
+
+func TestContext_MaterializeEntry_JiraIssues_MultiFile(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]any{
+			"issues": []map[string]any{
+				{"key": "TES-1", "fields": map[string]any{"summary": "First", "status": map[string]string{"name": "Open"}, "issuetype": map[string]string{"name": "Bug"}, "priority": map[string]string{"name": "High"}}},
+				{"key": "TES-2", "fields": map[string]any{"summary": "Second", "status": map[string]string{"name": "Done"}, "issuetype": map[string]string{"name": "Task"}, "priority": map[string]string{"name": "Low"}}},
+			},
+			"nextPageToken": "",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	old := utils.ExportJiraBaseURL()
+	utils.SetJiraBaseURL(server.URL)
+	defer utils.SetJiraBaseURL(old)
+
+	c := &Context{}
+	entry := recipes.ContextEntry_builder{
+		Path: "jira-issues",
+		From: jiraIssuesFrom("test-org", []string{"TES"}, nil),
+	}.Build()
+
+	entries, err := c.materializeEntry(context.Background(), entry, &core.GenerationContext{})
+	require.NoError(t, err)
+	require.Len(t, entries, 3) // 1 summary + 2 issues
+
+	// Summary file
+	require.True(t, entries[0].HasFile())
+	assert.Equal(t, "jira-issues.json", entries[0].GetFile().GetPath())
+	assert.Contains(t, entries[0].GetFile().GetContent(), `"id": "TES-1"`)
+	assert.Contains(t, entries[0].GetFile().GetContent(), `"id": "TES-2"`)
+
+	// Per-issue files
+	require.True(t, entries[1].HasFile())
+	assert.Equal(t, "issues/TES-1.json", entries[1].GetFile().GetPath())
+	assert.Contains(t, entries[1].GetFile().GetContent(), `"key": "TES-1"`)
+
+	require.True(t, entries[2].HasFile())
+	assert.Equal(t, "issues/TES-2.json", entries[2].GetFile().GetPath())
+	assert.Contains(t, entries[2].GetFile().GetContent(), `"key": "TES-2"`)
+}
+
+// --- Linear issues context tests ---
+
+func linearIssuesFrom(workspace string, teams []string, authEnvVar *string) *recipes.ContextFrom {
+	return recipes.ContextFrom_builder{
+		LinearIssues: recipes.LinearIssuesSource_builder{
+			Workspace:       workspace,
+			Teams:           teams,
+			AuthTokenEnvVar: authEnvVar,
+		}.Build(),
+	}.Build()
+}
+
+func TestContext_MaterializeEntry_LinearIssues_MissingAuth(t *testing.T) {
+	t.Parallel()
+	c := &Context{}
+	entry := recipes.ContextEntry_builder{
+		Path: "linear-issues",
+		From: linearIssuesFrom("ws", nil, nil),
+	}.Build()
+	_, err := c.materializeEntry(context.Background(), entry, &core.GenerationContext{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "linear API requires authentication")
+}
+
+func TestContext_Materialize_LinearIssues_ErrorPropagation(t *testing.T) {
+	t.Parallel()
+	c := &Context{}
+
+	ctx := recipes.Context_builder{
+		Entries: []*recipes.ContextEntry{
+			recipes.ContextEntry_builder{
+				Path: "linear-issues",
+				From: linearIssuesFrom("ws", nil, nil),
+			}.Build(),
+		},
+	}.Build()
+
+	_, err := c.Materialize(context.Background(), ctx, &core.GenerationContext{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to materialize entry for path linear-issues")
+	assert.Contains(t, err.Error(), "linear API requires authentication")
+}
+
+func TestContext_MaterializeEntry_LinearIssues_MultiFile(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		resp := map[string]any{
+			"data": map[string]any{
+				"issues": map[string]any{
+					"nodes": []map[string]any{
+						{"identifier": "ENG-10", "title": "Linear first", "state": map[string]string{"name": "Open"}, "priorityLabel": "High"},
+						{"identifier": "ENG-11", "title": "Linear second", "state": map[string]string{"name": "Done"}, "priorityLabel": "Low"},
+					},
+					"pageInfo": map[string]any{"hasNextPage": false, "endCursor": ""},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	old := utils.ExportLinearBaseURL()
+	utils.SetLinearBaseURL(server.URL)
+	defer utils.SetLinearBaseURL(old)
+
+	c := &Context{}
+	envVar := "TEST_LINEAR_MULTI"
+	entry := recipes.ContextEntry_builder{
+		Path: "linear-issues",
+		From: linearIssuesFrom("ws", nil, &envVar),
+	}.Build()
+
+	genCtx := &core.GenerationContext{
+		EnvOverrides: map[string]string{"TEST_LINEAR_MULTI": "test-token"},
+	}
+	entries, err := c.materializeEntry(context.Background(), entry, genCtx)
+	require.NoError(t, err)
+	require.Len(t, entries, 3) // 1 summary + 2 issues
+
+	// Summary file
+	require.True(t, entries[0].HasFile())
+	assert.Equal(t, "linear-issues.json", entries[0].GetFile().GetPath())
+	assert.Contains(t, entries[0].GetFile().GetContent(), `"id": "ENG-10"`)
+	assert.Contains(t, entries[0].GetFile().GetContent(), `"id": "ENG-11"`)
+
+	// Per-issue files
+	require.True(t, entries[1].HasFile())
+	assert.Equal(t, "issues/ENG-10.json", entries[1].GetFile().GetPath())
+	assert.Contains(t, entries[1].GetFile().GetContent(), `"identifier": "ENG-10"`)
+
+	require.True(t, entries[2].HasFile())
+	assert.Equal(t, "issues/ENG-11.json", entries[2].GetFile().GetPath())
+	assert.Contains(t, entries[2].GetFile().GetContent(), `"identifier": "ENG-11"`)
 }

@@ -3,18 +3,25 @@ package generators
 import (
 	"bytes"
 	"context"
+	"flag"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"time"
+
 	"github.com/opensdd/osdd-api/clients/go/osdd"
 	"github.com/opensdd/osdd-api/clients/go/osdd/recipes"
 	"github.com/opensdd/osdd-core/core"
+	"github.com/opensdd/osdd-core/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+var updateGolden = flag.Bool("update", false, "update golden testdata files")
 
 func TestContext_IntegrationTest_TextSource(t *testing.T) {
 	if testing.Short() {
@@ -34,7 +41,7 @@ func TestContext_IntegrationTest_TextSource(t *testing.T) {
 		},
 	}.Build()
 
-	result, err := c.Materialize(context.Background(), ctx, nil)
+	result, err := c.Materialize(context.Background(), ctx, &core.GenerationContext{})
 	require.NoError(t, err)
 	require.Len(t, result.GetEntries(), 1)
 
@@ -63,7 +70,7 @@ func TestContext_IntegrationTest_CmdSource(t *testing.T) {
 		},
 	}.Build()
 
-	result, err := c.Materialize(context.Background(), ctx, nil)
+	result, err := c.Materialize(context.Background(), ctx, &core.GenerationContext{})
 	require.NoError(t, err)
 	require.Len(t, result.GetEntries(), 1)
 
@@ -98,7 +105,7 @@ func TestContext_IntegrationTest_MultipleEntries(t *testing.T) {
 		},
 	}.Build()
 
-	result, err := c.Materialize(context.Background(), ctx, nil)
+	result, err := c.Materialize(context.Background(), ctx, &core.GenerationContext{})
 	require.NoError(t, err)
 	require.Len(t, result.GetEntries(), 2)
 
@@ -141,7 +148,7 @@ func TestContext_IntegrationTest_FailFast(t *testing.T) {
 		},
 	}.Build()
 
-	_, err := c.Materialize(context.Background(), ctx, nil)
+	_, err := c.Materialize(context.Background(), ctx, &core.GenerationContext{})
 	assert.Error(t, err, "expected error due to failed command")
 }
 
@@ -165,7 +172,7 @@ func TestContext_IntegrationTest_RealGithubFetch(t *testing.T) {
 		},
 	}.Build()
 
-	result, err := c.Materialize(context.Background(), ctx, nil)
+	result, err := c.Materialize(context.Background(), ctx, &core.GenerationContext{})
 	require.NoError(t, err, "unexpected error fetching from GitHub")
 	require.Len(t, result.GetEntries(), 1)
 
@@ -315,8 +322,6 @@ func TestContext_IntegrationTest_GitRepoWithGhAuth(t *testing.T) {
 		t.Skip("gh auth token returned empty token")
 	}
 
-	t.Setenv("OSDD_TEST_GH_TOKEN", token)
-
 	c := &Context{}
 	workspace := t.TempDir()
 
@@ -335,7 +340,10 @@ func TestContext_IntegrationTest_GitRepoWithGhAuth(t *testing.T) {
 		},
 	}.Build()
 
-	genCtx := &core.GenerationContext{WorkspacePath: workspace}
+	genCtx := &core.GenerationContext{
+		WorkspacePath: workspace,
+		EnvOverrides:  map[string]string{"OSDD_TEST_GH_TOKEN": token},
+	}
 	result, err := c.Materialize(context.Background(), ctx, genCtx)
 	require.NoError(t, err, "unexpected error cloning with gh auth token")
 	require.Len(t, result.GetEntries(), 1)
@@ -348,4 +356,232 @@ func TestContext_IntegrationTest_GitRepoWithGhAuth(t *testing.T) {
 	info, err := os.Stat(filepath.Join(clonedPath, ".git"))
 	require.NoError(t, err, ".git directory should exist in cloned repo")
 	assert.True(t, info.IsDir())
+}
+
+func TestContext_IntegrationTest_JiraIssuesSource(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	org := testutil.IntegEnv("OSDD_TEST_JIRA_ORG")
+	token := testutil.IntegEnv("OSDD_TEST_JIRA_TOKEN")
+	project := testutil.IntegEnv("OSDD_TEST_JIRA_PROJECT")
+	if org == "" || token == "" || project == "" {
+		t.Skip("OSDD_TEST_JIRA_ORG, OSDD_TEST_JIRA_TOKEN, and OSDD_TEST_JIRA_PROJECT required (env var or ~/.config/osdd/.env.integ-test)")
+	}
+
+	c := &Context{}
+	ctx := recipes.Context_builder{
+		Entries: []*recipes.ContextEntry{
+			recipes.ContextEntry_builder{
+				Path: "jira-issues",
+				From: recipes.ContextFrom_builder{
+					JiraIssues: recipes.JiraIssuesSource_builder{
+						Organization:    org,
+						Projects:        []string{project},
+						AuthTokenEnvVar: strPtr("OSDD_JIRA_TOKEN"),
+					}.Build(),
+				}.Build(),
+			}.Build(),
+		},
+	}.Build()
+
+	genCtx := &core.GenerationContext{
+		EnvOverrides: map[string]string{"OSDD_JIRA_TOKEN": token},
+	}
+	result, err := c.Materialize(context.Background(), ctx, genCtx)
+	require.NoError(t, err, "unexpected error fetching Jira issues")
+
+	entries := result.GetEntries()
+	require.GreaterOrEqual(t, len(entries), 2, "expected at least summary + 1 issue file")
+
+	// First entry is the summary
+	summary := entries[0]
+	require.True(t, summary.HasFile())
+	assert.Equal(t, "jira-issues.json", summary.GetFile().GetPath())
+	assert.Contains(t, summary.GetFile().GetContent(), `"id"`)
+	assert.Contains(t, summary.GetFile().GetContent(), `"title"`)
+
+	// Remaining entries are per-issue files
+	for _, e := range entries[1:] {
+		require.True(t, e.HasFile())
+		assert.True(t, strings.HasPrefix(e.GetFile().GetPath(), "issues/"), "expected per-issue file in issues/ folder")
+		assert.True(t, strings.HasSuffix(e.GetFile().GetPath(), ".json"), "expected .json extension")
+	}
+
+	if issueID := testutil.IntegEnv("OSDD_TEST_JIRA_ISSUE"); issueID != "" {
+		found := false
+		for _, e := range entries[1:] {
+			if e.GetFile().GetPath() == "issues/"+issueID+".json" {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "expected to find per-issue file for %s", issueID)
+	}
+}
+
+func TestContext_IntegrationTest_LinearIssuesSource(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	token := testutil.IntegEnv("OSDD_TEST_LINEAR_TOKEN")
+	if token == "" {
+		t.Skip("OSDD_TEST_LINEAR_TOKEN required (env var or ~/.config/osdd/.env.integ-test)")
+	}
+
+	c := &Context{}
+	ctx := recipes.Context_builder{
+		Entries: []*recipes.ContextEntry{
+			recipes.ContextEntry_builder{
+				Path: "linear-issues",
+				From: recipes.ContextFrom_builder{
+					LinearIssues: recipes.LinearIssuesSource_builder{
+						Workspace:       "test",
+						AuthTokenEnvVar: strPtr("OSDD_LINEAR_TOKEN"),
+					}.Build(),
+				}.Build(),
+			}.Build(),
+		},
+	}.Build()
+
+	genCtx := &core.GenerationContext{
+		EnvOverrides: map[string]string{"OSDD_LINEAR_TOKEN": token},
+	}
+	result, err := c.Materialize(context.Background(), ctx, genCtx)
+	require.NoError(t, err, "unexpected error fetching Linear issues")
+
+	entries := result.GetEntries()
+	require.GreaterOrEqual(t, len(entries), 2, "expected at least summary + 1 issue file")
+
+	// First entry is the summary
+	summary := entries[0]
+	require.True(t, summary.HasFile())
+	assert.Equal(t, "linear-issues.json", summary.GetFile().GetPath())
+	assert.Contains(t, summary.GetFile().GetContent(), `"id"`)
+	assert.Contains(t, summary.GetFile().GetContent(), `"title"`)
+
+	// Remaining entries are per-issue files
+	for _, e := range entries[1:] {
+		require.True(t, e.HasFile())
+		assert.True(t, strings.HasPrefix(e.GetFile().GetPath(), "issues/"), "expected per-issue file in issues/ folder")
+		assert.True(t, strings.HasSuffix(e.GetFile().GetPath(), ".json"), "expected .json extension")
+	}
+
+	if issueID := testutil.IntegEnv("OSDD_TEST_LINEAR_ISSUE"); issueID != "" {
+		found := false
+		for _, e := range entries[1:] {
+			if e.GetFile().GetPath() == "issues/"+issueID+".json" {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "expected to find per-issue file for %s", issueID)
+	}
+}
+
+// TestContext_Golden_JiraDevplan fetches real Jira issues from the devplan
+// organization and compares the materialized output against golden files
+// stored in testdata/jira_devplan_golden/.
+//
+// Run with -update to regenerate the golden files:
+//
+//	go test ./core/generators/ -run Golden_JiraDevplan -count=1 -update -v
+func TestContext_Golden_JiraDevplan(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	org := testutil.IntegEnv("OSDD_TEST_JIRA_ORG")
+	if org != "devplan" {
+		t.Skip("golden test only runs when OSDD_TEST_JIRA_ORG=devplan")
+	}
+	token := testutil.IntegEnv("OSDD_TEST_JIRA_TOKEN")
+	project := testutil.IntegEnv("OSDD_TEST_JIRA_PROJECT")
+	if token == "" || project == "" {
+		t.Skip("OSDD_TEST_JIRA_TOKEN and OSDD_TEST_JIRA_PROJECT required")
+	}
+
+	// Use a fixed date range to produce a small, stable set of issues (idempotent).
+	// Adjust the window so it captures ~5-10 issues from the devplan project.
+	from := timestamppb.New(time.Date(2025, 9, 14, 0, 0, 0, 0, time.UTC))
+	to := timestamppb.New(time.Date(2025, 9, 16, 0, 0, 0, 0, time.UTC))
+
+	c := &Context{}
+	ctx := recipes.Context_builder{
+		Entries: []*recipes.ContextEntry{
+			recipes.ContextEntry_builder{
+				Path: "jira-issues",
+				From: recipes.ContextFrom_builder{
+					JiraIssues: recipes.JiraIssuesSource_builder{
+						Organization:    org,
+						Projects:        []string{project},
+						AuthTokenEnvVar: strPtr("OSDD_JIRA_TOKEN"),
+						Filter: recipes.IssuesFilter_builder{
+							CreatedAtFilter: osdd.DatesFilter_builder{
+								From: from,
+								To:   to,
+							}.Build(),
+						}.Build(),
+					}.Build(),
+				}.Build(),
+			}.Build(),
+		},
+	}.Build()
+
+	genCtx := &core.GenerationContext{
+		EnvOverrides: map[string]string{"OSDD_JIRA_TOKEN": token},
+	}
+	result, err := c.Materialize(context.Background(), ctx, genCtx)
+	require.NoError(t, err)
+
+	entries := result.GetEntries()
+	require.GreaterOrEqual(t, len(entries), 2, "expected summary + at least 1 issue")
+
+	goldenDir := "testdata/jira_devplan_golden"
+
+	if *updateGolden {
+		// Wipe and recreate golden directory.
+		require.NoError(t, os.RemoveAll(goldenDir))
+		require.NoError(t, os.MkdirAll(filepath.Join(goldenDir, "issues"), 0o755))
+		for _, e := range entries {
+			require.True(t, e.HasFile())
+			p := filepath.Join(goldenDir, e.GetFile().GetPath())
+			require.NoError(t, os.MkdirAll(filepath.Dir(p), 0o755))
+			require.NoError(t, os.WriteFile(p, []byte(e.GetFile().GetContent()), 0o644))
+		}
+		t.Logf("updated %d golden files in %s", len(entries), goldenDir)
+		return
+	}
+
+	// Compare each materialized entry against its golden file.
+	for _, e := range entries {
+		require.True(t, e.HasFile())
+		relPath := e.GetFile().GetPath()
+		goldenPath := filepath.Join(goldenDir, relPath)
+
+		expected, err := os.ReadFile(goldenPath)
+		require.NoError(t, err, "golden file missing for %s (run with -update to generate)", relPath)
+		assert.Equal(t, string(expected), e.GetFile().GetContent(), "mismatch for %s", relPath)
+	}
+
+	// Verify no stale golden files remain that are no longer produced.
+	var goldenFiles []string
+	require.NoError(t, filepath.Walk(goldenDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return err
+		}
+		rel, _ := filepath.Rel(goldenDir, path)
+		goldenFiles = append(goldenFiles, rel)
+		return nil
+	}))
+
+	produced := make(map[string]bool, len(entries))
+	for _, e := range entries {
+		produced[e.GetFile().GetPath()] = true
+	}
+	for _, gf := range goldenFiles {
+		assert.True(t, produced[gf], "stale golden file %s no longer produced (run with -update)", gf)
+	}
 }

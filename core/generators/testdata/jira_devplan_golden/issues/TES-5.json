@@ -1,0 +1,19 @@
+{
+  "key": "TES-5",
+  "fields": {
+    "summary": "Everything is broken",
+    "description": null,
+    "status": {
+      "name": "Backlog"
+    },
+    "assignee": null,
+    "issuetype": {
+      "name": "Story"
+    },
+    "priority": {
+      "name": "Medium"
+    },
+    "created": "2025-09-15T15:23:02.422-0700",
+    "updated": "2025-09-15T15:23:02.614-0700"
+  }
+}

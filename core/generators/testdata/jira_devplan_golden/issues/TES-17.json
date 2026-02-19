@@ -1,0 +1,288 @@
+{
+  "key": "TES-17",
+  "fields": {
+    "summary": "Reload Indicator Component",
+    "description": {
+      "type": "doc",
+      "version": 1,
+      "content": [
+        {
+          "type": "heading",
+          "attrs": {
+            "level": 4
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "User Story"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "As a Devplan workspace user (founder, PM, engineer), I want a reload indicator that provides immediate, clear visual feedback during data reloads or refresh actions so that I can maintain focus and confidence in the system's responsiveness."
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "attrs": {
+            "level": 4
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Acceptance Criteria"
+            }
+          ]
+        },
+        {
+          "type": "orderedList",
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "The reload indicator displays a spinner animation during reload operations, a checkmark for success, and an exclamation for error."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "The indicator supports customization of size, color, and placement via props/configuration."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "The indicator integrates with frontend state management (Context API or Redux) to trigger visibility and state transitions based on reload events."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "The indicator provides API hooks/callbacks for external components to control its state."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Animations are smooth and optimized for performance across supported browsers."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "The indicator is accessible, implementing ARIA roles and live regions for screen readers, and supports keyboard navigation/focus management."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "attrs": {
+            "level": 4
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Dependencies"
+            }
+          ]
+        },
+        {
+          "type": "bulletList",
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "None (self-contained component, but expects integration with frontend state management and external triggers)."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "attrs": {
+            "level": 4
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Edge Cases \u0026 Handling"
+            }
+          ]
+        },
+        {
+          "type": "bulletList",
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "If a reload takes longer than 10 seconds, display a subtle progress indicator or message to reassure users."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "If the reload fails due to network issues, show the error state and provide a retry button."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "If the indicator is customized to a very small size, ensure accessibility and visibility are not compromised."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "If the indicator is placed near a busy UI area, ensure it remains prominent and does not overlap critical controls."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "If multiple reloads are triggered in quick succession, debounce state transitions to avoid flicker."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "attrs": {
+            "level": 3
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "AI Coding Prompt:"
+            }
+          ]
+        },
+        {
+          "type": "codeBlock",
+          "attrs": {
+            "language": "markdown"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Implement the feature: Reload Indicator Component\n\nThis feature is part of the following context from the PRD:\n- Frontend: React + TypeScript in a Next.js app. The reload indicator is a lightweight, reusable UI component that provides visual feedback during data reloads in the AI-powered workspace. It must support loading / success / error states, be accessible (ARIA live regions, keyboard focus management), configurable (size, color, placement), integrate with frontend state (Context API or Redux) and provide API hooks/callbacks for external control. Animations should be smooth and performant; analytics events must be emitted to PostHog and error conditions reported to Sentry. No backend changes required.\n\nFeature Goals:\n- Provide a reusable React + TypeScript reload indicator component exposing an API usable by pages/components that perform reloads.\n- Visually present three states: loading (spinner), success (checkmark), error (exclamation) with a retry affordance.\n- Be configurable via props (size, color, placement) and controllable via Context or Redux integration (subscribe to reload events).\n- Announce status changes to screen readers using ARIA live regions and support keyboard navigation/focus for retry.\n- Debounce transient reloads to avoid flicker; show a subtle progress message if reload exceeds 10s.\n- Emit analytics events to PostHog for reload_started, reload_succeeded, reload_failed, reload_retry_clicked.\n- Report unexpected errors to Sentry.\n\nFeature Acceptance Criteria:\n1. The component displays spinner during loading, checkmark on success briefly then hides, and exclamation on error with a visible retry button.\n2. Props/config allow customizing size, color (primary/semantic), and placement strategy (inline, absolute near anchor, anchored via container).\n3. Component can be controlled by:\n   - Local props (status, start/stop callbacks) OR\n   - A provided Context API or Redux slice subscription to state transitions.\n4. Exposes callbacks: onReloadStart(), onReloadSuccess(), onReloadError(error), onRetry().\n5. Animations use GPU-friendly transforms or CSS transitions; no janky layout thrashing.\n6. Accessibility: uses role=\"status\" with aria-live=\"polite\" (or appropriate), visible focus target for retry, and keyboard operable retry.\n7. Debounces multiple quick reload events to avoid flicker (e.g., show spinner after short delay and coalesce rapid transitions).\n8. On reload \u003e10s, component displays a subtle progress message (text or small progress dot) and emits a long-loading analytics event.\n9. Instrumentation: component calls PostHog capture for the four key events and Sentry.captureException on error cases where provided.\n10. Unit and integration tests verify rendering, accessibility, debounce behavior, retry callback invocation, analytics calls, and long-loading behavior.\n\nTechnical Details:\n\nHigh-level tasks\n- Implement a reusable React + TypeScript ReloadIndicator component (render-only) with props to control status, customization, callbacks, and placement behavior.\n- Implement a small controller hook and optional Context provider (useReloadIndicator / ReloadIndicatorContext) that components can use to trigger reload flows without direct prop plumbing. Also supply guidance / example for connecting to Redux (a recommended action name and state shape).\n- Add instrumentation calls to PostHog and Sentry integration points (use existing PostHog and Sentry modules/patterns used across the repo).\n- Implement CSS animations and transitions optimized for performance.\n- Implement accessibility: ARIA live region, role, keyboard focus management for retry button, enforce minimum accessible click/touch size for small variants.\n- Add behavior to handle edge cases: debounced display, long-loading (\u003e10s) indicator with message, network error handling and retry UI.\n- Add unit tests and integration tests (Jest + React Testing Library, possibly axe accessibility checks) that validate visual states, keyboard support, debounce and long-loading behavior, and analytics/sentry calls.\n\nDetailed technical requirements and tasks\n\n1) Component public API (example TypeScript interface — adapt to repo conventions)\n- Props (example):\n  - status?: 'idle' | 'loading' | 'success' | 'error'  // controlled status; default 'idle'\n  - size?: 'sm' | 'md' | 'lg' | number                  // standard sizes or px value\n  - color?: string                                     // CSS color or semantic token (e.g., 'primary', 'success', 'danger')\n  - placement?: 'inline' | 'absolute' | 'anchor'       // how it is placed in UI\n  - message?: string | { loading?: string; success?: string; error?: string; longLoading?: string }\n  - showSuccessDurationMs?: number                     // how long to show success, default ~800ms\n  - debounceMs?: number                                // debounce time to avoid flicker, e.g., 200ms\n  - longLoadingMs?: number                             // threshold for long loading message, default 10_000\n  - minAccessibleSizePx?: number                       // min touch/click target size\n  - onReloadStart?: () =\u003e void\n  - onReloadSuccess?: () =\u003e void\n  - onReloadError?: (error?: string) =\u003e void\n  - onRetry?: () =\u003e void\n  - className?: string\n  - ariaLabel?: string\n  - testId?: string\n- Behavior:\n  - When status transitions to 'loading', wait debounceMs before showing spinner (to avoid flicker for very quick reloads). If a new state arrives before debounce expires, do not render spinner.\n  - If loading is shown and reaches longLoadingMs, show a small unobtrusive text \"Still loading…\" or an optional progress affordance; emit a PostHog event \"reload_long_running\" once per reload.\n  - When status transitions to 'success', display a checkmark icon for showSuccessDurationMs then hide (transition to idle). Emit PostHog 'reload_succeeded' and call onReloadSuccess.\n  - When status transitions to 'error', display error icon and an accessible retry button. Call onReloadError and emit PostHog 'reload_failed', and call Sentry.captureException with error context (if provided).\n  - Retry button: keyboard focusable, labelled via aria-label, calls onRetry, emits PostHog 'reload_retry_clicked', and returns to loading state if callback triggers reload. Ensure retry button is reachable via Tab order and visible focus ring.\n\n2) Hook / Context API\n- Provide useReloadIndicator hook that returns:\n  - startReload(options?: { id?: string, meta?: any }) -\u003e void\n  - succeedReload(options?: { id?: string }) -\u003e void\n  - failReload(error?: string | Error, options?: { id?: string }) -\u003e void\n  - subscribe(callback: (state: ReloadState) =\u003e void)  // optional\n- Provide ReloadIndicatorProvider to install a global context that components can obtain. The provider should:\n  - Maintain a minimal ReloadState: { status: 'idle'|'loading'|'success'|'error', errorMessage?: string, lastUpdated?: number, id?: string }\n  - Support multiple concurrent reloads: keep a reference count or map keyed by id; coalesce into a single visible indicator for same UI region. Debounce/coalesce events to avoid flicker.\n- Integration guidance for Redux:\n  - Suggest optional Redux slice shape example (for teams preferring Redux):\n    - { reload: { status: 'idle'|'loading'|'success'|'error', errorMessage?: string, lastUpdated?: number } }\n  - Action names suggestion: reload/start, reload/succeed, reload/error, reload/retry. Provide example of wiring the component to read from store (selector) or dispatch actions.\n\n3) Placement \u0026 Styling\n- Follow repo UI conventions:\n  - Use existing UI primitives for icons/buttons and design tokens (e.g., lucide-react icons, shared Button component, theme tokens), not new raw HTML styles.\n  - Styling approach: match repository conventions (CSS Modules or Styled Components / Tailwind). Use the same pattern used in the codebase for small UI primitives (e.g., if project uses Tailwind + shadcn UI primitives, implement classes accordingly). Keep CSS isolated and memoized.\n- Placement:\n  - Inline: flows where you render \u003cReloadIndicator placement=\"inline\" /\u003e next to a button or heading.\n  - Absolute: allow placement via CSS position with offsets (top/right) to overlay near anchor; accept style/className for fine tuning.\n  - Anchor: optional prop to provide a ref to an anchor element where indicator is positioned relative to it (use a portal + absolute positioning).\n- Size and min-accessible size:\n  - Ensure touch/click targets meet minimum accessible size; if a small size is passed, enforce a minimum hitbox by wrapping with padding (visually small but accessible).\n\n4) Animations \u0026 Performance\n- Use CSS transforms and opacity transitions for show/hide (translateZ(0) or transform: translateY) to ensure GPU compositing.\n- Use will-change: transform, opacity on animated elements.\n- Keep animations short and non-blocking. Use requestAnimationFrame for JS-driven transitions if necessary.\n- Memoize icons/components to avoid re-rendering on unrelated state updates.\n\n5) Accessibility\n- ARIA:\n  - Use role=\"status\" and aria-live=\"polite\" on a visually-hidden or visible text node that announces the current status message for screen readers.\n  - Provide aria-hidden on purely decorative icons (SVG) and ensure the status text is read instead.\n- Keyboard:\n  - Ensure retry button is focusable (tabindex default) and focus is programmatically moved to retry button when entering error state (use focus() inside a useEffect when status transitions to error).\n  - Provide visible focus ring consistent with repository style.\n- Contrast and semantics:\n  - Ensure color tokens meet WCAG contrast for the chosen themes; when small size reduces visibility, show a tooltip or text alternative.\n- Testing:\n  - Include accessibility unit tests using axe-core (jest-axe) to assert there are no violations for all three states.\n\n6) Analytics \u0026 Error Monitoring\n- PostHog:\n  - Emit events with the following properties:\n    - reload_started: {component: 'ReloadIndicator', placement, id?, meta?}\n    - reload_succeeded: {component: 'ReloadIndicator', durationMs, id?}\n    - reload_failed: {component: 'ReloadIndicator', errorMessage, id?}\n    - reload_retry_clicked: {component: 'ReloadIndicator', id?}\n    - reload_long_running: {component: 'ReloadIndicator', durationMs, id?}\n  - Use the repo’s existing PostHog helper module (follow existing pattern in the codebase) to capture events.\n- Sentry:\n  - On error path call Sentry.captureException(error, { tags: { feature: 'reload-indicator', placement } , extra: { id, meta } })\n  - Only send sanitized, non-sensitive data.\n\n7) Edge cases \u0026 robustness\n- Multiple reloads in quick succession:\n  - Use debounceMs to delay showing the spinner to avoid flicker for very short reload cycles.\n  - Use a map of active reload operations (by optional id) and only go to idle when all tracked reloads complete — or if a single operation drives the UI, coalesce to last known status.\n- Long reloads:\n  - After longLoadingMs (default 10_000) display a subtle progress text or secondary spinner dot and emit the \"reload_long_running\" event.\n- Retry flow:\n  - Provide immediate visual feedback when retry is clicked (switch to loading) and call onRetry callback.\n- Small sizes:\n  - If user supplies very small size values, enforce minimum hit area and readable status text via aria-label. If size \u003c threshold, then show only icon but ensure aria-label present.\n- Overlapping busy areas:\n  - When used near busy interactive controls, allow z-index and placement customization so it doesn’t block critical controls.\n\n8) Integration points with existing repository components\n- Use existing icon set (lucide-react) for spinner/check/exclamation icons and the project Button component for retry.\n- Use existing analytics wrapper (PostHog) as used in src/app/components/PostHogAnalytics.tsx.\n- Use existing Sentry integration pattern used elsewhere in the repo to capture exceptions.\n- Hook into global state:\n  - Provide usage examples in docs for both Context API and Redux:\n    - Context example: Wrap App (or company layout) with \u003cReloadIndicatorProvider/\u003e; components call const { startReload, succeedReload, failReload } = useReloadIndicator() when performing reload actions (e.g., onClick reload button).\n    - Redux example: Provide example selector and component that maps status to the ReloadIndicator status prop. Example action names shown above.\n- Provide an optional HOC or helper hook to wire existing data fetching code (React Query / server actions) to the Reload Indicator:\n  - Example usage: useQuery(..., { onMutate: () =\u003e startReload(), onSuccess: () =\u003e succeedReload(), onError: (err) =\u003e failReload(err) })\n\n9) Module/architecture changes (high level)\n- Add a new UI component module (e.g., components/ui/ReloadIndicator) containing the visual component and styles.\n- Add a hooks module (e.g., hooks/useReloadIndicator) and a context provider (ReloadIndicatorProvider) implementing the controller logic.\n- Add a small analytics wrapper module or reuse the project's PostHog helper to emit events.\n- Add tests in the existing test structure (unit and integration) using Jest + React Testing Library + jest-axe.\n- No database schema changes.\n\nInterfaces and Types (examples to implement — adapt to repo style)\n- type ReloadStatus = 'idle' | 'loading' | 'success' | 'error'\n- interface ReloadState {\n    status: ReloadStatus\n    errorMessage?: string | null\n    lastUpdated?: number\n    id?: string\n  }\n- interface ReloadIndicatorProps {\n    status?: ReloadStatus\n    size?: 'sm'|'md'|'lg'|number\n    color?: string\n    placement?: 'inline'|'absolute'|'anchor'\n    message?: string | { loading?: string; success?: string; error?: string; longLoading?: string }\n    debounceMs?: number\n    longLoadingMs?: number\n    showSuccessDurationMs?: number\n    onReloadStart?: () =\u003e void\n    onReloadSuccess?: () =\u003e void\n    onReloadError?: (err?: string) =\u003e void\n    onRetry?: () =\u003e void\n    ariaLabel?: string\n    className?: string\n    testId?: string\n  }\n\nIntegration Points:\n- Context API:\n  - Provide ReloadIndicatorProvider to wrap application regions. Components performing reloads call useReloadIndicator() to drive the indicator.\n- Redux:\n  - Provide example mapping to connect the component to a reload slice; suggest action names and selectors.\n- React Query:\n  - Provide example of wiring useQuery/useMutation lifecycle callbacks to startReload/succeedReload/failReload.\n- Analytics:\n  - Call the project's PostHog helper capturing events in every major state transition.\n- Error monitoring:\n  - Call Sentry.captureException on error transitions with sanitized context.\n\nDatabase/Schema Changes:\n- None.\n\nSide Effects / Dependencies:\n- UI: New component will be used inline near reload actions; consumers must import the component or use the provider/hook.\n- Analytics: There is a dependency on PostHog being initialized in the app; the implementation should use the repository’s existing PostHog wrapper to capture events.\n- Error monitoring: Uses existing Sentry integration; ensure Sentry is present in app initialization.\n- Styling: Ensure component uses the repository’s preferred styling system (Tailwind/shadcn UI) and iconography (lucide-react).\n- Performance: Keep component tree minimal; memoize icons and static subcomponents.\n\nExamples / Conventions:\n- Follow current TypeScript conventions and strict typing.\n- Follow repository UI primitives (use Button, Icon, Tooltip components rather than raw \u003cbutton\u003e where available).\n- Use PostHog wrapper and Sentry usage consistent with the rest of the repo.\n- Follow existing folder and naming conventions (components under src/components/ui, hooks under src/hooks).\n- Keep accessibility attributes and tests aligned with repository patterns (use existing a11y test helpers if present).\n\nTesting:\n- Unit tests (Jest + React Testing Library)\n  - Test rendering of each state: idle not visible, loading shows spinner after debounce, success shows check for configured duration, error shows exclamation + retry button.\n  - Test ARIA attributes: role=\"status\", aria-live present, aria-label text per state.\n  - Test keyboard: Tab nav reaches retry button; pressing Enter/Space on focused retry triggers onRetry.\n  - Test debounce behavior: simulate start-\u003esuccess quickly and assert no render (no flicker); simulate longer flow and spinner appears.\n  - Test long-loading behavior: advance timers to \u003e longLoadingMs and assert long-loading message shown and event emitted.\n  - Analytics/Sentry: mock PostHog and Sentry to assert events were emitted with expected payloads when transitions occur.\n  - Test coalescing multiple concurrent reload attempts (if implemented) — ensure only one indicator visible and last status wins when all complete.\n- Integration tests:\n  - Example wiring with useMutation / useQuery (or example context) to demonstrate integration: simulate a component that calls startReload, then succeedReload/failReload and assert indicator behaves end-to-end.\n  - Accessibility tests: run jest-axe to assert no a11y violations in each state.\n- Use timers mocks (jest.useFakeTimers) for debounce and long-loading tests.\n\nDeliverables\n- Implemented ReloadIndicator component (React + TypeScript) with props described above.\n- useReloadIndicator hook plus ReloadIndicatorProvider (Context) and documentation example for wiring to Redux and React Query.\n- Instrumentation integration with PostHog and Sentry using repo conventions.\n- Unit and integration tests covering acceptance criteria and edge cases described above.\n- Small usage documentation snippet showing:\n  - Controlled usage: \u003cReloadIndicator status={status} onRetry={...} /\u003e\n  - Context usage: const { startReload, succeedReload, failReload } = useReloadIndicator()\n  - Redux example mapping\n- Accessibility checks included in tests (jest-axe).\n\nNotes \u0026 Implementation hints (follow repo specifics)\n- Icons: use lucide-react icons used by repo for consistency.\n- Buttons and UI primitives: use the repo’s Button and Tooltip components or the shadcn UI primitives to maintain consistent visuals and keyboard/focus styles.\n- Analytics \u0026 Sentry: reuse existing helper modules rather than instantiating PostHog or Sentry directly. If a PostHog helper wraps capture/event names, follow the wrapper signature.\n- Follow existing CSS/styling conventions in repo (Tailwind utilities/shadcn components or CSS Modules depending on the repo style) and prefer className overrides to custom inline styles where possible.\n- Keep runtime overhead minimal: memoize icons and avoid complex state logic in render path; prefer useEffect for side-effectful analytics or Sentry calls.\n\nAcceptance verification checklist (developer to verify on completion)\n- Visual states render and animate correctly for loading, success, and error.\n- Component props change behavior (size, color, placement).\n- Context hook works end-to-end: calling startReload/succeedReload/failReload drives the visible indicator.\n- Retry button is keyboard-accessible and invokes callback; focus management works on error.\n- Debounce prevents flicker on very short reloads.\n- Long-loading message appears after configured threshold and emits analytics.\n- PostHog events are emitted with expected event names and payloads.\n- Errors are sent to Sentry with sanitized context.\n- Tests pass (unit, integration, accessibility) and code follows repository patterns.\n\nImplement this component and its supporting hook/provider and tests so that other frontend developers can import the visual component directly or wire reload flows with the provided context/hook. Provide short usage examples demonstrating the three integration patterns (controlled component, context/hook, Redux selector) and ensure instrumentation integration uses the repository’s PostHog and Sentry wrappers."
+            }
+          ]
+        }
+      ]
+    },
+    "status": {
+      "name": "Backlog"
+    },
+    "assignee": null,
+    "issuetype": {
+      "name": "Story"
+    },
+    "priority": {
+      "name": "Medium"
+    },
+    "created": "2025-09-15T16:07:24.975-0700",
+    "updated": "2025-09-15T16:07:25.190-0700"
+  }
+}

@@ -1,0 +1,326 @@
+{
+  "key": "TES-18",
+  "fields": {
+    "summary": "Reload Indicator Error \u0026 Analytics",
+    "description": {
+      "type": "doc",
+      "version": 1,
+      "content": [
+        {
+          "type": "heading",
+          "attrs": {
+            "level": 4
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "User Story"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "As a Devplan workspace user, I want the reload indicator to handle errors gracefully and provide retry options, while the system tracks reload events and errors for analytics so that I can recover from issues and the team can monitor effectiveness."
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "attrs": {
+            "level": 4
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Acceptance Criteria"
+            }
+          ]
+        },
+        {
+          "type": "orderedList",
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "When a reload fails, the indicator displays an error state (exclamation icon) and a retry button."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "Clicking retry re-triggers the reload and updates the indicator state accordingly."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "All reload events ("
+                    },
+                    {
+                      "type": "text",
+                      "text": "reload_started",
+                      "marks": [
+                        {
+                          "type": "code"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "text": ", "
+                    },
+                    {
+                      "type": "text",
+                      "text": "reload_succeeded",
+                      "marks": [
+                        {
+                          "type": "code"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "text": ", "
+                    },
+                    {
+                      "type": "text",
+                      "text": "reload_failed",
+                      "marks": [
+                        {
+                          "type": "code"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "text": ", "
+                    },
+                    {
+                      "type": "text",
+                      "text": "reload_retry_clicked",
+                      "marks": [
+                        {
+                          "type": "code"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "text": ") are tracked via PostHog analytics."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "All reload errors are logged to Sentry for monitoring and debugging."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "The indicator handles network failures and long reload times gracefully, showing appropriate messages or fallback states."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "The error state is accessible, with ARIA live region updates and keyboard navigation for retry actions."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "attrs": {
+            "level": 4
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Dependencies"
+            }
+          ]
+        },
+        {
+          "type": "bulletList",
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "reload-indicator-core (component must exist to display error states and handle retry logic)."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "attrs": {
+            "level": 4
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Edge Cases \u0026 Handling"
+            }
+          ]
+        },
+        {
+          "type": "bulletList",
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "If a reload fails repeatedly, limit retries and display a message suggesting the user check their connection or contact support."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "If analytics or error logging services are unavailable, fail gracefully and avoid blocking the UI."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "If the user navigates away during a reload, cancel pending analytics/error logging and clean up indicator state."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "If the retry button is triggered via keyboard, ensure focus returns to the indicator after action."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "attrs": {
+            "level": 3
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "AI Coding Prompt:"
+            }
+          ]
+        },
+        {
+          "type": "codeBlock",
+          "attrs": {
+            "language": "markdown"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Implement the feature: Reload Indicator Error \u0026 Analytics\n\nThis feature is part of the following context from the PRD:\n- The reload indicator is a React + TypeScript UI component used across the Next.js web frontend to show reload status for parts of the AI-powered workspace. It already supports visual states (loading, success, error) and can be controlled via global or local state (Context API or Redux). This feature adds robust error handling, retry behavior, PostHog analytics events, and Sentry error logging while preserving accessibility (ARIA live regions, keyboard navigation) and graceful failure if analytics/logging services are unavailable. No backend changes are required.\n\nFeature Goals:\n- When a reload fails, show an accessible error state with an exclamation icon and a retry button (keyboard- and screen-reader-friendly).\n- Clicking retry re-triggers the reload flow and updates the UI state correctly (loading → success/error).\n- Track reload lifecycle events via PostHog: reload_started, reload_succeeded, reload_failed, reload_retry_clicked, including contextual metadata (component location/scope, duration, retryCount, error message).\n- Log reload errors to Sentry with contextual data and breadcrumbs.\n- Handle network failures and long reload times with a fallback message; limit retries after repeated failures and show next-step guidance (check connection/contact support).\n- If analytics or Sentry are unavailable, do not block UI; degrade gracefully.\n- Cancel pending analytics/error logging and clean up indicator state if the user navigates away during a reload; return focus to indicator after keyboard-triggered retry.\n\nFeature Acceptance Criteria:\n1. On reload failure, indicator displays error state with exclamation icon and visible retry button.\n2. Retry triggers reload and transitions indicator through states properly; retry action is usable via keyboard and returns focus as specified.\n3. PostHog events are emitted for reload_started, reload_succeeded, reload_failed, reload_retry_clicked with useful properties (scopeId, elementId, status, durationMs, retryCount, errorMessage).\n4. Sentry receives captured exceptions for reload failures with context and breadcrumbs.\n5. Long-running reloads show a \"taking longer than expected\" fallback after a configurable timeout and offer an option to cancel or continue waiting.\n6. If analytics or error-logging services are unavailable, the component proceeds without blocking UI and does not throw uncaught errors.\n7. Repeated failures are limited by a configurable maxRetries; after limit reached show a message to check connection/contact support.\n8. If user navigates away during reload, pending analytics/error logs are cleaned up/cancelled and indicator state is cleared to avoid leaks.\n9. Accessibility: ARIA live region announces state transitions, and retry button is keyboard-focusable; using keyboard to trigger retry returns focus to indicator after action.\n\nTechnical Details:\n\nHigh-level approach\n- Extend the existing reload-indicator-core component API by adding error-handling and analytics hooks. The UI logic lives in the React component layer and uses the existing global or local reload state mechanism (Context API or Redux).\n- Provide a small consumer-facing hook API (or props) so external components can:\n  - initiate reloads (triggerReload)\n  - provide the actual reload function (async function that performs the data refresh)\n  - receive callbacks for state changes (onReloadStart/Success/Error/Retry)\n- Instrument PostHog and Sentry within the component/hook implementation; calls must be guarded so the component continues to work if those services are not initialized.\n\nConcrete tasks and requirements\n\n1) Public API / integration contract\n- The enhanced reload indicator should support both controlled and uncontrolled usage:\n  - Controlled: accept a status prop (ReloadState.status: 'idle' | 'loading' | 'success' | 'error') and callbacks: onReloadStart(), onReloadSuccess(), onReloadError(error: string), onRetry().\n  - Uncontrolled: accept a required async reloadFunction: () =\u003e Promise\u003cvoid\u003e which the indicator will call itself when user triggers a reload (or when programmatically triggered via provided triggerReload()).\n- Add optional props/config:\n  - maxRetries?: number (default 3)\n  - longLoadTimeoutMs?: number (default 20_000) — after which the \"taking longer than expected\" fallback state is shown\n  - analyticsEnabled?: boolean (default true)\n  - sentryEnabled?: boolean (default true)\n  - scope?: { scopeId?: string, elementId?: string } — used as metadata in analytics and Sentry\n  - onStateChange?: (state: ReloadState) =\u003e void — to notify parent components or store\n- Expose a hook that consumers can use where appropriate:\n  - useReloadIndicator(reloadFunction, options) → { status, errorMessage, retryCount, triggerReload, retry, cancel, bindToIndicatorProps }.\n  - bindToIndicatorProps is an object of props to spread onto the visual indicator (e.g., role/aria attributes and event handlers).\n\n2) Behavior: reload lifecycle and UI transitions\n- When a reload is initiated:\n  - Set state.status = 'loading', record startTime (Date.now()) and increment local attempt counter for this reload sequence.\n  - Emit PostHog event reload_started with metadata: { scopeId, elementId, attemptId (UUID), retryCount, timestamp }.\n  - Add a Sentry breadcrumb indicating reload started (if available).\n  - Start a long-load timer (longLoadTimeoutMs). If timer fires, set a fallback UI message in loading state (e.g., \"Still loading — this is taking longer than expected\") and add PostHog breadcrumb/metric \"reload_long_running\".\n- When the reload resolves successfully:\n  - Clear long-load timer.\n  - Set status to 'success' and briefly show success icon (per core logic), then auto-dismiss.\n  - Emit PostHog event reload_succeeded with runtime/duration and retryCount and attemptId metadata.\n  - Add Sentry breadcrumb for success.\n- When the reload fails/throws:\n  - Clear long-load timer.\n  - Update status to 'error', set errorMessage (sanitized).\n  - Emit PostHog event reload_failed with errorMessage, durationMs, retryCount, attemptId, networkError boolean if detectable.\n  - Capture exception in Sentry capturing error and include extra: { scopeId, elementId, attemptId, retryCount, durationMs } and breadcrumbs (reload_started, any long-load).\n  - Show retry button and accessible error message (see Accessibility section).\n- Retry action:\n  - When retry triggered (click or keyboard), increment retryCount, emit PostHog reload_retry_clicked (include previous attemptId and new retryCount), and call the same reloadFunction flow again using a new attemptId. Keep a total attempt counter to enforce maxRetries.\n  - If retries exceed maxRetries, disable the retry button and show a persistent message with suggested next steps (check connection or contact support). Also emit PostHog event reload_failed with reason 'max_retries_reached' (and breadcrumb to Sentry).\n- If the user navigates away during an active reload:\n  - Abort pending timers and mark current attempt as cancelled.\n  - Cancel any in-flight telemetry dispatches where possible (e.g., use AbortController pattern for networked analytics calls when supported).\n  - Do not attempt further retries; call onStateChange({status: 'idle'}) to clear indicator.\n  - Emit PostHog event reload_failed or reload_cancelled with reason 'navigated_away' only if telemetry library supports immediate dispatch — otherwise skip; do not throw.\n\n3) Analytics with PostHog\n- Use existing PostHog client used by the app (reuse the same module/import pattern as project's PostHog integration).\n- Emit the following events including metadata (if available):\n  - reload_started: { attemptId, scopeId, elementId, retryCount, timestamp }\n  - reload_succeeded: { attemptId, scopeId, elementId, retryCount, durationMs, timestamp }\n  - reload_failed: { attemptId, scopeId, elementId, retryCount, durationMs, errorMessage, networkError? }\n  - reload_retry_clicked: { previousAttemptId, newAttemptId, scopeId, elementId, previousRetryCount, newRetryCount, timestamp }\n- Ensure the analytics call is wrapped in try/catch. If PostHog is not initialized or network fails, swallow errors and proceed (no UI blocking).\n- Keep analytics payload size minimal; do not send sensitive data (no request/response bodies or secrets).\n\n4) Error logging with Sentry\n- Use the existing Sentry SDK pattern used in the codebase. If Sentry client is not present, use a safe wrapper that no-ops.\n- On reload failure call Sentry.captureException(error) with additional context:\n  - setContext('reload_indicator', { scopeId, elementId, attemptId, retryCount, durationMs })\n  - add breadcrumbs: {event: 'reload_started', timestamp}, {event: 'long_load'} if occurred, and {event: 'reload_retry_clicked'} as they occur.\n- Wrap all Sentry calls in try/catch; if Sentry is unavailable, do not block UI.\n\n5) Accessibility and keyboard handling\n- ARIA:\n  - The visual indicator must include an ARIA live region (aria-live=\"polite\" or \"assertive\" depending on desired verbosity) that announces changes: \"Loading\", \"Reload succeeded\", \"Reload failed: [brief message]\" when states change.\n  - The retry button must have clear accessible name (\"Retry loading\", \"Retry\") and aria-describedby pointing to the error message region if present.\n- Keyboard focus:\n  - The retry control must be reachable via Tab and activated via Enter/Space.\n  - If retry was initiated via keyboard, after the reload completes (success or failure), return focus to the indicator root (or the retry button if still visible) so keyboard users remain in the expected flow.\n  - Provide focusOutline and ensure high-contrast visibility per repository UI guidelines.\n- Screen-reader announcement:\n  - When the error state is entered, send a succinct announcement that does not include technical detail: e.g., \"Reload failed. Press Retry to try again.\" Longer error details should be available via an aria-describedby link or tooltip.\n\n6) Robustness and edge cases\n- Network failure detection:\n  - When the reloadFunction rejects with an Error, inspect error (if instanceof DOMException and name === 'AbortError' treat as cancelled; if error.message contains network signals classify networkError true). Do not rely on fragile string matching.\n- Retry limit and messaging:\n  - After maxRetries is reached, show persistent guidance: \"We couldn't reload. Check your connection or contact support.\" Optionally include a link to support/contact route if available in the app (configurable prop). Emit PostHog event for 'max_retries_reached'.\n- Analytics/Sentry unavailability:\n  - Wrap telemetry calls in guards; telemetry failure must not change UI behavior.\n  - Use a local fallback queue for PostHog events if desired but not required—must not block UI.\n- Navigation away:\n  - Use a cleanup effect (useEffect cleanup) to cancel timers and mark in-flight attempt as aborted when component unmounts.\n  - Do not call onReloadSuccess/onReloadError callbacks after unmount.\n- Concurrency:\n  - Prevent concurrent reload attempts for the same indicator instance. If an external trigger tries to start reload while already loading, ignore or queue a single subsequent retry depending on configuration (prefer ignoring and returning the current Promise to callers).\n- Telemetry deduplication:\n  - Include attemptId (UUID) to correlate attempts; this helps tie events across retries.\n\n7) Types and interfaces (examples)\n- ReloadState (example):\n  - interface ReloadState {\n      status: 'idle' | 'loading' | 'success' | 'error';\n      errorMessage?: string | null;\n      lastUpdated?: number | null;\n      retryCount: number;\n    }\n- Hook return type (example):\n  - interface UseReloadIndicatorReturn {\n      status: ReloadState['status'];\n      errorMessage?: string | null;\n      retryCount: number;\n      triggerReload: () =\u003e Promise\u003cvoid\u003e;\n      retry: () =\u003e Promise\u003cvoid\u003e;\n      cancel: () =\u003e void;\n      bindToIndicatorProps: {\n        role: string;\n        'aria-live': 'polite' | 'assertive';\n        tabIndex?: number;\n        onKeyDown?: (e: KeyboardEvent) =\u003e void;\n      };\n    }\n- Props for component (example):\n  - interface ReloadIndicatorProps {\n      controlledStatus?: ReloadState['status'];\n      reloadFunction?: () =\u003e Promise\u003cvoid\u003e;\n      onReloadStart?: () =\u003e void;\n      onReloadSuccess?: () =\u003e void;\n      onReloadError?: (err: Error) =\u003e void;\n      maxRetries?: number;\n      longLoadTimeoutMs?: number;\n      analyticsEnabled?: boolean;\n      sentryEnabled?: boolean;\n      scope?: { scopeId?: string; elementId?: string };\n    }\n\n8) Architecture / Module Changes\n- Modules to add/extend:\n  - Enhance reload-indicator-core module to accept the new props and to export a companion hook (useReloadIndicator) that encapsulates the reload lifecycle, telemetry, and error handling.\n  - Add a small telemetry utility wrapper (telemetry.reload) that calls PostHog and Sentry in a safe, guarded manner (no-op if not initialized).\n  - If the project has a central analytics wrapper (likely present), integrate with that existing wrapper rather than importing posthog-js directly — follow repository conventions for analytics imports.\n- Keep the component UI-layer separate from the reload orchestration/hook so that consumers can either control it externally or use the integrated hook.\n\n9) Integration Points\n- Global state:\n  - If the app uses Redux or Context to broadcast reload operations, provide optional integration: allow the hook to accept an external signal (e.g., subscribe to reload action in store) to start or cancel reloads. But the component should also work standalone via props.\n- Analytics:\n  - Reuse the app's existing PostHog integration code path (the repository contains a PostHog integration module). If that module exposes a function to capture events, call that function; otherwise, use posthog-js guarded import.\n- Error monitoring:\n  - Reuse the app's Sentry wrapper if available; otherwise use @sentry/browser (or the same Sentry client used elsewhere) with a guard so behavior is non-blocking if Sentry is not configured.\n- Accessibility:\n  - Use existing UI primitives (buttons, icons, tooltip) from the project's design system to keep look-and-feel consistent.\n\n10) Database/Schema Changes\n- None required.\n\n11) Side Effects / Dependencies\n- UI:\n  - Visual changes for error state (exclamation icon), retry button, optional long-loading message and max-retries guidance.\n  - Smooth animations should follow the current indicator animation style; reuse CSS Modules or Styled Components per project conventions.\n- External services:\n  - PostHog: event emissions as described.\n  - Sentry: captureException for reload failures and capture breadcrumbs.\n- Clean-up:\n  - Cancel timers and avoid memory leaks on unmount or navigation.\n\n12) Examples / Conventions\n- Follow existing project patterns for analytics and logging:\n  - Use the same PostHog integration utilities used by other components.\n  - Use the same Sentry wrapper if present.\n  - Use existing UI primitives (buttons/icons) and CSS conventions (CSS Modules or Styled Components) used in the repo.\n- Keep component lightweight and avoid heavy re-renders; memoize static icons and handlers.\n\n13) Testing\n- Unit tests:\n  - Test the hook and component behavior for:\n    - Successful reload: transition loading → success, PostHog events emitted with expected properties, Sentry not called.\n    - Failed reload: transition loading → error, PostHog reload_failed event emitted, Sentry.captureException called with correct context.\n    - Retry flow: clicking retry emits reload_retry_clicked and causes another start; retryCount increments; after success the state resolves.\n    - Max retries: after exceeding maxRetries, retry button disabled and guidance message shown; PostHog event for max_retries_reached emitted.\n    - Long load fallback: after longLoadTimeoutMs, long-load UI appears and PostHog breadcrumb/event emitted.\n    - Analytics and Sentry not available: ensure no exceptions thrown and UI still behaves.\n    - Unmount/navigation during loading: no further callbacks fired, timers cleared, no attempts to call onReloadSuccess/onReloadError after unmount.\n  - Accessibility tests:\n    - ARIA live region contains the announced text upon state changes.\n    - Retry button keyboard activation triggers reload and focus management behaves as specified (return focus after completion).\n  - Mock PostHog and Sentry: verify event payload structure and calls.\n- Integration tests:\n  - Simulate component embedded near an actual data-fetching control that triggers reloadFunction that resolves, rejects with network error, or rejects repeatedly; verify UI events and telemetry.\n- Testing approach:\n  - Align tests with existing test framework (Jest + React Testing Library used in repo). Use jest.fn/mocks for PostHog and Sentry wrappers and DOM focus utilities to assert keyboard interactions.\n  - Keep tests focused on behavior described in acceptance criteria; avoid over-engineering wide coverage.\n\n14) Implementation notes and constraints\n- Do not send PII or large payloads to analytics/Sentry.\n- Use short-lived attemptId (UUIDv4 or similar) to allow correlation of events; include only non-sensitive scoping metadata (scopeId, elementId) that consumers provide.\n- Make retryCount and longLoadTimeoutMs configurable via props so UIs can tweak behavior per place of use.\n- All telemetry calls must be non-blocking and must not cause application errors if libraries fail.\n- Keep animations hardware-accelerated where possible (transform/opacity) to avoid jank.\n\nDeliverables for the coding agent:\n- Implement the enhanced reload indicator component (or extension) and a hook useReloadIndicator implementing the above lifecycle (no backend changes).\n- Implement a small safe telemetry wrapper that uses existing PostHog and Sentry integrations (guarded).\n- Add unit tests (Jest + React Testing Library) for core success/failure/retry/maxRetries/long-load/unmount paths and accessibility checks.\n- Provide a short README or usage comment in the module describing the new public props and hook usage (controlled vs uncontrolled) and how to integrate with global state (optional).\n- Ensure code follows repository conventions for imports, styling (CSS Modules or Styled Components), and error handling.\n\nIf you need repository-specific import paths for PostHog and Sentry wrappers or examples of existing analytics wiring, fetch the project's PostHog integration module (the repo contains a PostHog analytics component) and reuse that module to guarantee consistent telemetry."
+            }
+          ]
+        }
+      ]
+    },
+    "status": {
+      "name": "Backlog"
+    },
+    "assignee": null,
+    "issuetype": {
+      "name": "Story"
+    },
+    "priority": {
+      "name": "Medium"
+    },
+    "created": "2025-09-15T16:07:26.463-0700",
+    "updated": "2025-09-15T16:07:26.670-0700"
+  }
+}

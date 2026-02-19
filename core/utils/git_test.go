@@ -14,7 +14,7 @@ func TestBuildGitCloneURL(t *testing.T) {
 	tests := []struct {
 		name    string
 		repo    *osdd.GitRepository
-		envVars map[string]string
+		token   string
 		want    string
 		wantErr string
 	}{
@@ -34,26 +34,20 @@ func TestBuildGitCloneURL(t *testing.T) {
 			want: "https://bitbucket.org/owner/repo.git",
 		},
 		{
-			name:    "github with auth token",
-			repo:    osdd.GitRepository_builder{FullName: "owner/repo", Provider: "github", AuthTokenEnvVar: strPtr("TEST_GIT_TOKEN")}.Build(),
-			envVars: map[string]string{"TEST_GIT_TOKEN": "mytoken123"},
-			want:    "https://x-access-token:mytoken123@github.com/owner/repo.git",
+			name:  "github with auth token",
+			repo:  osdd.GitRepository_builder{FullName: "owner/repo", Provider: "github"}.Build(),
+			token: "mytoken123",
+			want:  "https://x-access-token:mytoken123@github.com/owner/repo.git",
 		},
 		{
-			name:    "bitbucket with auth token",
-			repo:    osdd.GitRepository_builder{FullName: "owner/repo", Provider: "bitbucket", AuthTokenEnvVar: strPtr("TEST_BB_TOKEN")}.Build(),
-			envVars: map[string]string{"TEST_BB_TOKEN": "bbtoken456"},
-			want:    "https://x-token-auth:bbtoken456@bitbucket.org/owner/repo.git",
+			name:  "bitbucket with auth token",
+			repo:  osdd.GitRepository_builder{FullName: "owner/repo", Provider: "bitbucket"}.Build(),
+			token: "bbtoken456",
+			want:  "https://x-token-auth:bbtoken456@bitbucket.org/owner/repo.git",
 		},
 		{
-			name:    "auth env var configured but empty",
-			repo:    osdd.GitRepository_builder{FullName: "owner/repo", Provider: "github", AuthTokenEnvVar: strPtr("TEST_EMPTY_TOKEN")}.Build(),
-			envVars: map[string]string{"TEST_EMPTY_TOKEN": ""},
-			want:    "https://github.com/owner/repo.git",
-		},
-		{
-			name: "auth env var configured but not set",
-			repo: osdd.GitRepository_builder{FullName: "owner/repo", Provider: "github", AuthTokenEnvVar: strPtr("TEST_UNSET_TOKEN")}.Build(),
+			name: "empty token",
+			repo: osdd.GitRepository_builder{FullName: "owner/repo", Provider: "github"}.Build(),
 			want: "https://github.com/owner/repo.git",
 		},
 		{
@@ -75,12 +69,7 @@ func TestBuildGitCloneURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Set env vars for this test
-			for k, v := range tt.envVars {
-				t.Setenv(k, v)
-			}
-
-			url, err := BuildGitCloneURL(tt.repo)
+			url, err := BuildGitCloneURL(tt.repo, tt.token)
 
 			if tt.wantErr != "" {
 				require.Error(t, err)
@@ -96,7 +85,7 @@ func TestBuildGitCloneURL(t *testing.T) {
 
 func TestCloneGitRepo(t *testing.T) {
 	t.Run("nil repo", func(t *testing.T) {
-		err := CloneGitRepo(context.Background(), nil, t.TempDir())
+		err := CloneGitRepo(context.Background(), nil, t.TempDir(), "")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "git repository cannot be nil")
 	})
@@ -104,7 +93,7 @@ func TestCloneGitRepo(t *testing.T) {
 	t.Run("invalid url causes clone failure", func(t *testing.T) {
 		repo := osdd.GitRepository_builder{FullName: "nonexistent/repo-that-does-not-exist-anywhere-99999", Provider: "github"}.Build()
 		dest := filepath.Join(t.TempDir(), "clone-target")
-		err := CloneGitRepo(context.Background(), repo, dest)
+		err := CloneGitRepo(context.Background(), repo, dest, "")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "git clone failed")
 	})

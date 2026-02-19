@@ -700,17 +700,17 @@ func TestContext_MaterializeEntry_JiraIssues_MultiFile(t *testing.T) {
 
 	// Summary file
 	require.True(t, entries[0].HasFile())
-	assert.Equal(t, "jira-issues.json", entries[0].GetFile().GetPath())
+	assert.Equal(t, "jira-issues/all-issues.json", entries[0].GetFile().GetPath())
 	assert.Contains(t, entries[0].GetFile().GetContent(), `"id": "TES-1"`)
 	assert.Contains(t, entries[0].GetFile().GetContent(), `"id": "TES-2"`)
 
 	// Per-issue files
 	require.True(t, entries[1].HasFile())
-	assert.Equal(t, "issues/TES-1.json", entries[1].GetFile().GetPath())
+	assert.Equal(t, "jira-issues/issues/TES-1.json", entries[1].GetFile().GetPath())
 	assert.Contains(t, entries[1].GetFile().GetContent(), `"key": "TES-1"`)
 
 	require.True(t, entries[2].HasFile())
-	assert.Equal(t, "issues/TES-2.json", entries[2].GetFile().GetPath())
+	assert.Equal(t, "jira-issues/issues/TES-2.json", entries[2].GetFile().GetPath())
 	assert.Contains(t, entries[2].GetFile().GetContent(), `"key": "TES-2"`)
 }
 
@@ -795,16 +795,16 @@ func TestContext_MaterializeEntry_LinearIssues_MultiFile(t *testing.T) {
 
 	// Summary file
 	require.True(t, entries[0].HasFile())
-	assert.Equal(t, "linear-issues.json", entries[0].GetFile().GetPath())
+	assert.Equal(t, "linear-issues/all-issues.json", entries[0].GetFile().GetPath())
 	assert.Contains(t, entries[0].GetFile().GetContent(), `"id": "ENG-10"`)
 	assert.Contains(t, entries[0].GetFile().GetContent(), `"id": "ENG-11"`)
 
 	// Per-issue files
 	require.True(t, entries[1].HasFile())
-	assert.Equal(t, "issues/ENG-10.json", entries[1].GetFile().GetPath())
+	assert.Equal(t, "linear-issues/issues/ENG-10.json", entries[1].GetFile().GetPath())
 	assert.Contains(t, entries[1].GetFile().GetContent(), `"identifier": "ENG-10"`)
 
 	require.True(t, entries[2].HasFile())
-	assert.Equal(t, "issues/ENG-11.json", entries[2].GetFile().GetPath())
+	assert.Equal(t, "linear-issues/issues/ENG-11.json", entries[2].GetFile().GetPath())
 	assert.Contains(t, entries[2].GetFile().GetContent(), `"identifier": "ENG-11"`)
 }

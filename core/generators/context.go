@@ -100,7 +100,8 @@ func (c *Context) materializeEntry(ctx context.Context, entry *recipes.ContextEn
 }
 
 // materializeIssues converts an IssuesResult into a summary file and per-issue files.
-// The summary is written to <path>.json; individual issues go to issues/<id>.json.
+// Path is treated as a folder: the summary is written to <path>/all-issues.json;
+// individual issues go to <path>/issues/<id>.json.
 func (c *Context) materializeIssues(path string, fetch func() (*utils.IssuesResult, error)) ([]*osdd.MaterializedResult_Entry, error) {
 	result, err := fetch()
 	if err != nil {
@@ -114,8 +115,8 @@ func (c *Context) materializeIssues(path string, fetch func() (*utils.IssuesResu
 
 	entries := make([]*osdd.MaterializedResult_Entry, 0, 1+len(result.Issues))
 
-	// Summary file at <path>.json
-	summaryPath := path + ".json"
+	// Summary file at <path>/all-issues.json
+	summaryPath := path + "/all-issues.json"
 	entries = append(entries, osdd.MaterializedResult_Entry_builder{
 		File: osdd.FullFileContent_builder{
 			Path:    summaryPath,
@@ -123,9 +124,9 @@ func (c *Context) materializeIssues(path string, fetch func() (*utils.IssuesResu
 		}.Build(),
 	}.Build())
 
-	// Per-issue files at issues/<id>.json
+	// Per-issue files at <path>/issues/<id>.json
 	for _, s := range result.Summary {
-		issuePath := "issues/" + s.ID + ".json"
+		issuePath := path + "/issues/" + s.ID + ".json"
 		entries = append(entries, osdd.MaterializedResult_Entry_builder{
 			File: osdd.FullFileContent_builder{
 				Path:    issuePath,

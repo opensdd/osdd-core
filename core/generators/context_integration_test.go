@@ -398,21 +398,21 @@ func TestContext_IntegrationTest_JiraIssuesSource(t *testing.T) {
 	// First entry is the summary
 	summary := entries[0]
 	require.True(t, summary.HasFile())
-	assert.Equal(t, "jira-issues.json", summary.GetFile().GetPath())
+	assert.Equal(t, "jira-issues/all-issues.json", summary.GetFile().GetPath())
 	assert.Contains(t, summary.GetFile().GetContent(), `"id"`)
 	assert.Contains(t, summary.GetFile().GetContent(), `"title"`)
 
 	// Remaining entries are per-issue files
 	for _, e := range entries[1:] {
 		require.True(t, e.HasFile())
-		assert.True(t, strings.HasPrefix(e.GetFile().GetPath(), "issues/"), "expected per-issue file in issues/ folder")
+		assert.True(t, strings.HasPrefix(e.GetFile().GetPath(), "jira-issues/issues/"), "expected per-issue file in jira-issues/issues/ folder")
 		assert.True(t, strings.HasSuffix(e.GetFile().GetPath(), ".json"), "expected .json extension")
 	}
 
 	if issueID := testutil.IntegEnv("OSDD_TEST_JIRA_ISSUE"); issueID != "" {
 		found := false
 		for _, e := range entries[1:] {
-			if e.GetFile().GetPath() == "issues/"+issueID+".json" {
+			if e.GetFile().GetPath() == "jira-issues/issues/"+issueID+".json" {
 				found = true
 				break
 			}
@@ -458,21 +458,21 @@ func TestContext_IntegrationTest_LinearIssuesSource(t *testing.T) {
 	// First entry is the summary
 	summary := entries[0]
 	require.True(t, summary.HasFile())
-	assert.Equal(t, "linear-issues.json", summary.GetFile().GetPath())
+	assert.Equal(t, "linear-issues/all-issues.json", summary.GetFile().GetPath())
 	assert.Contains(t, summary.GetFile().GetContent(), `"id"`)
 	assert.Contains(t, summary.GetFile().GetContent(), `"title"`)
 
 	// Remaining entries are per-issue files
 	for _, e := range entries[1:] {
 		require.True(t, e.HasFile())
-		assert.True(t, strings.HasPrefix(e.GetFile().GetPath(), "issues/"), "expected per-issue file in issues/ folder")
+		assert.True(t, strings.HasPrefix(e.GetFile().GetPath(), "linear-issues/issues/"), "expected per-issue file in linear-issues/issues/ folder")
 		assert.True(t, strings.HasSuffix(e.GetFile().GetPath(), ".json"), "expected .json extension")
 	}
 
 	if issueID := testutil.IntegEnv("OSDD_TEST_LINEAR_ISSUE"); issueID != "" {
 		found := false
 		for _, e := range entries[1:] {
-			if e.GetFile().GetPath() == "issues/"+issueID+".json" {
+			if e.GetFile().GetPath() == "linear-issues/issues/"+issueID+".json" {
 				found = true
 				break
 			}
@@ -544,7 +544,7 @@ func TestContext_Golden_JiraDevplan(t *testing.T) {
 	if *updateGolden {
 		// Wipe and recreate golden directory.
 		require.NoError(t, os.RemoveAll(goldenDir))
-		require.NoError(t, os.MkdirAll(filepath.Join(goldenDir, "issues"), 0o755))
+		require.NoError(t, os.MkdirAll(goldenDir, 0o755))
 		for _, e := range entries {
 			require.True(t, e.HasFile())
 			p := filepath.Join(goldenDir, e.GetFile().GetPath())

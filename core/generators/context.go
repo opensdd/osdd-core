@@ -198,7 +198,7 @@ func (c *Context) fetchContent(ctx context.Context, from *recipes.ContextFrom, g
 		return string(b), nil
 
 	default:
-		return "", fmt.Errorf("unknown or unset context source type")
+		return "", fmt.Errorf("unknown or unset context source type [%+v]", from.WhichType())
 	}
 }
 

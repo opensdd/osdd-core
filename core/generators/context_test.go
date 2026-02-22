@@ -629,17 +629,17 @@ func TestContext_Materialize_GitRepo_ErrorPropagation(t *testing.T) {
 
 // --- Jira issues context tests ---
 
-func jiraIssuesFrom(org string, projects []string, authEnvVar *string) *recipes.ContextFrom {
+func jiraIssuesFrom(siteID string, projects []string, authEnvVar *string) *recipes.ContextFrom {
 	return recipes.ContextFrom_builder{
 		JiraIssues: recipes.JiraIssuesSource_builder{
-			Organization:    org,
+			SiteId:          siteID,
 			Projects:        projects,
 			AuthTokenEnvVar: authEnvVar,
 		}.Build(),
 	}.Build()
 }
 
-func TestContext_MaterializeEntry_JiraIssues_EmptyOrg(t *testing.T) {
+func TestContext_MaterializeEntry_JiraIssues_EmptySiteId(t *testing.T) {
 	t.Parallel()
 	c := &Context{}
 	entry := recipes.ContextEntry_builder{
@@ -648,7 +648,7 @@ func TestContext_MaterializeEntry_JiraIssues_EmptyOrg(t *testing.T) {
 	}.Build()
 	_, err := c.materializeEntry(context.Background(), entry, &core.GenerationContext{})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "jira organization cannot be empty")
+	assert.Contains(t, err.Error(), "jira site_id cannot be empty")
 }
 
 func TestContext_Materialize_JiraIssues_ErrorPropagation(t *testing.T) {
@@ -667,7 +667,7 @@ func TestContext_Materialize_JiraIssues_ErrorPropagation(t *testing.T) {
 	_, err := c.Materialize(context.Background(), ctx, &core.GenerationContext{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to materialize entry for path jira-issues")
-	assert.Contains(t, err.Error(), "jira organization cannot be empty")
+	assert.Contains(t, err.Error(), "jira site_id cannot be empty")
 }
 
 func TestContext_MaterializeEntry_JiraIssues_MultiFile(t *testing.T) {

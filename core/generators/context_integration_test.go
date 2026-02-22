@@ -363,11 +363,11 @@ func TestContext_IntegrationTest_JiraIssuesSource(t *testing.T) {
 		t.Skip()
 	}
 
-	org := testutil.IntegEnv("OSDD_TEST_JIRA_ORG")
+	siteID := testutil.IntegEnv("OSDD_TEST_JIRA_SITE_ID")
 	token := testutil.IntegEnv("OSDD_TEST_JIRA_TOKEN")
 	project := testutil.IntegEnv("OSDD_TEST_JIRA_PROJECT")
-	if org == "" || token == "" || project == "" {
-		t.Skip("OSDD_TEST_JIRA_ORG, OSDD_TEST_JIRA_TOKEN, and OSDD_TEST_JIRA_PROJECT required (env var or ~/.config/osdd/.env.integ-test)")
+	if siteID == "" || token == "" || project == "" {
+		t.Skip("OSDD_TEST_JIRA_SITE_ID, OSDD_TEST_JIRA_TOKEN, and OSDD_TEST_JIRA_PROJECT required (env var or ~/.config/osdd/.env.integ-test)")
 	}
 
 	c := &Context{}
@@ -377,7 +377,7 @@ func TestContext_IntegrationTest_JiraIssuesSource(t *testing.T) {
 				Path: "jira-issues",
 				From: recipes.ContextFrom_builder{
 					JiraIssues: recipes.JiraIssuesSource_builder{
-						Organization:    org,
+						SiteId:          siteID,
 						Projects:        []string{project},
 						AuthTokenEnvVar: strPtr("OSDD_JIRA_TOKEN"),
 					}.Build(),
@@ -482,7 +482,7 @@ func TestContext_IntegrationTest_LinearIssuesSource(t *testing.T) {
 }
 
 // TestContext_Golden_JiraDevplan fetches real Jira issues from the devplan
-// organization and compares the materialized output against golden files
+// site and compares the materialized output against golden files
 // stored in testdata/jira_devplan_golden/.
 //
 // Run with -update to regenerate the golden files:
@@ -493,9 +493,9 @@ func TestContext_Golden_JiraDevplan(t *testing.T) {
 		t.Skip()
 	}
 
-	org := testutil.IntegEnv("OSDD_TEST_JIRA_ORG")
-	if org != "devplan" {
-		t.Skip("golden test only runs when OSDD_TEST_JIRA_ORG=devplan")
+	siteID := testutil.IntegEnv("OSDD_TEST_JIRA_SITE_ID")
+	if siteID == "" {
+		t.Skip("golden test only runs when OSDD_TEST_JIRA_SITE_ID is set")
 	}
 	token := testutil.IntegEnv("OSDD_TEST_JIRA_TOKEN")
 	project := testutil.IntegEnv("OSDD_TEST_JIRA_PROJECT")
@@ -515,7 +515,7 @@ func TestContext_Golden_JiraDevplan(t *testing.T) {
 				Path: "jira-issues",
 				From: recipes.ContextFrom_builder{
 					JiraIssues: recipes.JiraIssuesSource_builder{
-						Organization:    org,
+						SiteId:          siteID,
 						Projects:        []string{project},
 						AuthTokenEnvVar: strPtr("OSDD_JIRA_TOKEN"),
 						Filter: recipes.IssuesFilter_builder{

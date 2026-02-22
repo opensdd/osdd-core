@@ -17,9 +17,9 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func jiraSource(org string, projects []string, authEnvVar *string, filter *recipes.IssuesFilter) *recipes.JiraIssuesSource {
+func jiraSource(siteID string, projects []string, authEnvVar *string, filter *recipes.IssuesFilter) *recipes.JiraIssuesSource {
 	b := recipes.JiraIssuesSource_builder{
-		Organization:    org,
+		SiteId:          siteID,
 		Projects:        projects,
 		Filter:          filter,
 		AuthTokenEnvVar: authEnvVar,
@@ -45,12 +45,12 @@ func TestFetchJiraIssues_NilSource(t *testing.T) {
 	assert.Contains(t, err.Error(), "jira issues source cannot be nil")
 }
 
-func TestFetchJiraIssues_EmptyOrganization(t *testing.T) {
+func TestFetchJiraIssues_EmptySiteId(t *testing.T) {
 	t.Parallel()
 	src := jiraSource("", nil, nil, nil)
 	_, err := FetchJiraIssues(context.Background(), src, "")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "jira organization cannot be empty")
+	assert.Contains(t, err.Error(), "jira site_id cannot be empty")
 }
 
 func TestFetchJiraIssues_Success(t *testing.T) {
@@ -118,7 +118,7 @@ func TestFetchJiraIssues_EmptyResponse(t *testing.T) {
 	assert.Empty(t, result.Issues)
 }
 
-func TestFetchJiraIssues_APIKey_BasicAuth(t *testing.T) {
+func TestFetchJiraIssues_BearerAuth(t *testing.T) {
 	var receivedAuth string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedAuth = r.Header.Get("Authorization")
@@ -131,16 +131,13 @@ func TestFetchJiraIssues_APIKey_BasicAuth(t *testing.T) {
 	jiraBaseURL = server.URL
 	defer func() { jiraBaseURL = old }()
 
-	src := jiraSource("test-org", nil, nil, nil)
-	_, err := FetchJiraIssues(context.Background(), src, "my-api-key")
+	src := jiraSource("test-site-id", nil, nil, nil)
+	_, err := FetchJiraIssues(context.Background(), src, "my-oauth-token")
 	require.NoError(t, err)
-	assert.True(t, strings.HasPrefix(receivedAuth, "Basic "), "expected Basic auth prefix")
-	decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(receivedAuth, "Basic "))
-	require.NoError(t, err)
-	assert.Equal(t, ":my-api-key", string(decoded))
+	assert.Equal(t, "Bearer my-oauth-token", receivedAuth)
 }
 
-func TestFetchJiraIssues_PersonalAccessToken_BasicAuth(t *testing.T) {
+func TestFetchJiraIssues_PAT_BasicAuth(t *testing.T) {
 	var receivedAuth string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedAuth = r.Header.Get("Authorization")
@@ -153,7 +150,7 @@ func TestFetchJiraIssues_PersonalAccessToken_BasicAuth(t *testing.T) {
 	jiraBaseURL = server.URL
 	defer func() { jiraBaseURL = old }()
 
-	src := jiraSource("test-org", nil, nil, nil)
+	src := jiraSource("test-site-id", nil, nil, nil)
 	_, err := FetchJiraIssues(context.Background(), src, "user@example.com:api-token-123")
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(receivedAuth, "Basic "), "expected Basic auth prefix")

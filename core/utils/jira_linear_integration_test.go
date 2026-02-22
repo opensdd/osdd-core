@@ -3,11 +3,14 @@ package utils
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/opensdd/osdd-api/clients/go/osdd"
 	"github.com/opensdd/osdd-api/clients/go/osdd/recipes"
 	"github.com/opensdd/osdd-core/core/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func integEnvOrSkip(t *testing.T, keys ...string) map[string]string {
@@ -27,11 +30,16 @@ func integEnvOrSkip(t *testing.T, keys ...string) map[string]string {
 }
 
 func TestFetchJiraIssues_Integration(t *testing.T) {
-	env := integEnvOrSkip(t, "OSDD_TEST_JIRA_ORG", "OSDD_TEST_JIRA_TOKEN", "OSDD_TEST_JIRA_PROJECT")
+	env := integEnvOrSkip(t, "OSDD_TEST_JIRA_SITE_ID", "OSDD_TEST_JIRA_TOKEN", "OSDD_TEST_JIRA_PROJECT")
 
+	from := timestamppb.New(time.Date(2026, 2, 15, 0, 0, 0, 0, time.UTC))
+	to := timestamppb.New(time.Date(2026, 2, 22, 0, 0, 0, 0, time.UTC))
 	src := recipes.JiraIssuesSource_builder{
-		Organization: env["OSDD_TEST_JIRA_ORG"],
-		Projects:     []string{env["OSDD_TEST_JIRA_PROJECT"]},
+		SiteId:   env["OSDD_TEST_JIRA_SITE_ID"],
+		Projects: []string{env["OSDD_TEST_JIRA_PROJECT"]},
+		Filter: recipes.IssuesFilter_builder{
+			CreatedAtFilter: osdd.DatesFilter_builder{From: from, To: to}.Build(),
+		}.Build(),
 	}.Build()
 
 	result, err := FetchJiraIssues(context.Background(), src, env["OSDD_TEST_JIRA_TOKEN"])

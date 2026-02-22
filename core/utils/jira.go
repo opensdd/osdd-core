@@ -61,23 +61,24 @@ type jiraAssignee struct {
 
 // FetchJiraIssues fetches issues from Jira Cloud using the REST API and returns
 // a structured IssuesResult containing a summary list and per-issue JSON.
-// The token parameter is the raw auth credential (email:token for PAT, or bare API key).
+// The token is used as a Bearer token for OAuth authentication via the
+// Atlassian API gateway (https://api.atlassian.com/ex/jira/{siteId}).
 func FetchJiraIssues(ctx context.Context, src *recipes.JiraIssuesSource, token string) (*IssuesResult, error) {
 	if src == nil {
 		return nil, fmt.Errorf("jira issues source cannot be nil")
 	}
 
-	org := strings.TrimSpace(src.GetOrganization())
-	if org == "" {
-		return nil, fmt.Errorf("jira organization cannot be empty")
+	siteID := strings.TrimSpace(src.GetSiteId())
+	if siteID == "" {
+		return nil, fmt.Errorf("jira site_id cannot be empty")
 	}
 
 	projects := src.GetProjects()
-	slog.Debug("Fetching Jira issues", "organization", org, "projects", projects)
+	slog.Debug("Fetching Jira issues", "siteId", siteID, "projects", projects)
 
 	baseURL := jiraBaseURL
 	if baseURL == "" {
-		baseURL = fmt.Sprintf("https://%s.atlassian.net", org)
+		baseURL = fmt.Sprintf("https://api.atlassian.com/ex/jira/%s", siteID)
 	}
 
 	jql := buildJQL(projects, src.GetFilter())
@@ -107,11 +108,11 @@ func FetchJiraIssues(ctx context.Context, src *recipes.JiraIssuesSource, token s
 		req.Header.Set("Accept", "application/json")
 		if token != "" {
 			if strings.Contains(token, ":") {
-				// email:token format (personal access token) → Basic Auth
+				// PAT (email:token) → Basic Auth
 				req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(token)))
 			} else {
-				// API key → Basic Auth with empty username
-				req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(":"+token)))
+				// OAuth token → Bearer Auth
+				req.Header.Set("Authorization", "Bearer "+token)
 			}
 		}
 

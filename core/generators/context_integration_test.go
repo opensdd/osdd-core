@@ -585,3 +585,67 @@ func TestContext_Golden_JiraDevplan(t *testing.T) {
 		assert.True(t, produced[gf], "stale golden file %s no longer produced (run with -update)", gf)
 	}
 }
+
+func TestContext_IntegrationTest_GitHistorySource(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	// Skip if gh CLI is not installed.
+	if _, err := exec.LookPath("gh"); err != nil {
+		t.Skip("gh CLI not installed, skipping git history integration test")
+	}
+
+	// Get a token from gh auth.
+	var tokenBuf bytes.Buffer
+	ghCmd := exec.Command("gh", "auth", "token")
+	ghCmd.Stdout = &tokenBuf
+	if err := ghCmd.Run(); err != nil {
+		t.Skipf("gh auth token failed (not logged in?): %v", err)
+	}
+	token := strings.TrimSpace(tokenBuf.String())
+	if token == "" {
+		t.Skip("gh auth token returned empty token")
+	}
+
+	// Use a narrow date range for deterministic results.
+	from := timestamppb.New(time.Date(2025, 9, 14, 0, 0, 0, 0, time.UTC))
+	to := timestamppb.New(time.Date(2025, 9, 16, 0, 0, 0, 0, time.UTC))
+
+	c := &Context{}
+	ctx := recipes.Context_builder{
+		Entries: []*recipes.ContextEntry{
+			recipes.ContextEntry_builder{
+				Path: "git-history",
+				From: recipes.ContextFrom_builder{
+					GitHistory: recipes.GitHistorySource_builder{
+						Repo: osdd.GitRepository_builder{
+							FullName:        "opensdd/osdd-api",
+							Provider:        "github",
+							AuthTokenEnvVar: strPtr("OSDD_GH_TOKEN"),
+						}.Build(),
+						DateFilter: osdd.DatesFilter_builder{
+							From: from,
+							To:   to,
+						}.Build(),
+					}.Build(),
+				}.Build(),
+			}.Build(),
+		},
+	}.Build()
+
+	genCtx := &core.GenerationContext{
+		EnvOverrides: map[string]string{"OSDD_GH_TOKEN": token},
+	}
+	result, err := c.Materialize(context.Background(), ctx, genCtx)
+	require.NoError(t, err, "unexpected error fetching git history")
+
+	entries := result.GetEntries()
+	t.Logf("Git history materialized %d files", len(entries))
+	for _, e := range entries {
+		require.True(t, e.HasFile())
+		t.Logf("  %s (%d bytes)", e.GetFile().GetPath(), len(e.GetFile().GetContent()))
+		assert.True(t, strings.HasPrefix(e.GetFile().GetPath(), "git-history/"),
+			"expected files under git-history/ folder, got %s", e.GetFile().GetPath())
+	}
+}

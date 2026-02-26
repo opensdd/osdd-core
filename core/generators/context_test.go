@@ -808,3 +808,109 @@ func TestContext_MaterializeEntry_LinearIssues_MultiFile(t *testing.T) {
 	assert.Equal(t, "linear-issues/issues/ENG-11.json", entries[2].GetFile().GetPath())
 	assert.Contains(t, entries[2].GetFile().GetContent(), `"identifier": "ENG-11"`)
 }
+
+// --- GitHistory context tests ---
+
+func gitHistoryFrom(fullName, provider string, authEnvVar *string) *recipes.ContextFrom {
+	return recipes.ContextFrom_builder{
+		GitHistory: recipes.GitHistorySource_builder{
+			Repo: osdd.GitRepository_builder{
+				FullName:        fullName,
+				Provider:        provider,
+				AuthTokenEnvVar: authEnvVar,
+			}.Build(),
+		}.Build(),
+	}.Build()
+}
+
+func TestContext_MaterializeEntry_GitHistory_NilRepo(t *testing.T) {
+	t.Parallel()
+	c := &Context{}
+	entry := recipes.ContextEntry_builder{
+		Path: "git-history",
+		From: recipes.ContextFrom_builder{
+			GitHistory: recipes.GitHistorySource_builder{}.Build(),
+		}.Build(),
+	}.Build()
+	_, err := c.materializeEntry(context.Background(), entry, &core.GenerationContext{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "git history source repo cannot be nil")
+}
+
+func TestContext_MaterializeEntry_GitHistory_EmptyFullName(t *testing.T) {
+	t.Parallel()
+	c := &Context{}
+	entry := recipes.ContextEntry_builder{
+		Path: "git-history",
+		From: gitHistoryFrom("", "github", nil),
+	}.Build()
+	_, err := c.materializeEntry(context.Background(), entry, &core.GenerationContext{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "git history source repo full_name cannot be empty")
+}
+
+func TestContext_Materialize_GitHistory_ErrorPropagation(t *testing.T) {
+	t.Parallel()
+	c := &Context{}
+
+	ctx := recipes.Context_builder{
+		Entries: []*recipes.ContextEntry{
+			recipes.ContextEntry_builder{
+				Path: "git-history",
+				From: gitHistoryFrom("", "github", nil),
+			}.Build(),
+		},
+	}.Build()
+
+	_, err := c.Materialize(context.Background(), ctx, &core.GenerationContext{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to materialize entry for path git-history")
+	assert.Contains(t, err.Error(), "git history source repo full_name cannot be empty")
+}
+
+func TestContext_MaterializeGitHistory(t *testing.T) {
+	t.Parallel()
+	c := &Context{}
+
+	entries, err := c.materializeGitHistory("history", func() (*utils.GitHistoryResult, error) {
+		return &utils.GitHistoryResult{
+			Files: []utils.GitHistoryFile{
+				{Name: "commits-001.md", Content: "# Commits\n\ncommit data"},
+				{Name: "prs/PR-42.md", Content: "# PRs\n\nPR data"},
+			},
+		}, nil
+	})
+	require.NoError(t, err)
+	require.Len(t, entries, 2)
+
+	require.True(t, entries[0].HasFile())
+	assert.Equal(t, "history/commits-001.md", entries[0].GetFile().GetPath())
+	assert.Contains(t, entries[0].GetFile().GetContent(), "commit data")
+
+	require.True(t, entries[1].HasFile())
+	assert.Equal(t, "history/prs/PR-42.md", entries[1].GetFile().GetPath())
+	assert.Contains(t, entries[1].GetFile().GetContent(), "PR data")
+}
+
+func TestContext_MaterializeGitHistory_Empty(t *testing.T) {
+	t.Parallel()
+	c := &Context{}
+
+	entries, err := c.materializeGitHistory("history", func() (*utils.GitHistoryResult, error) {
+		return &utils.GitHistoryResult{}, nil
+	})
+	require.NoError(t, err)
+	assert.Empty(t, entries)
+}
+
+func TestContext_MaterializeGitHistory_FetchError(t *testing.T) {
+	t.Parallel()
+	c := &Context{}
+
+	_, err := c.materializeGitHistory("history", func() (*utils.GitHistoryResult, error) {
+		return nil, fmt.Errorf("clone failed")
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to fetch git history")
+	assert.Contains(t, err.Error(), "clone failed")
+}

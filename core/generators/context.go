@@ -84,6 +84,14 @@ func (c *Context) materializeEntry(ctx context.Context, entry *recipes.ContextEn
 		})
 	}
 
+	if from.WhichType() == recipes.ContextFrom_GitHistory_case {
+		src := from.GetGitHistory()
+		token := resolveAuthToken(src.GetRepo().GetAuthTokenEnvVar(), genCtx)
+		return c.materializeGitHistory(path, func() (*utils.GitHistoryResult, error) {
+			return utils.FetchGitHistory(ctx, src, token)
+		})
+	}
+
 	content, err := c.fetchContent(ctx, from, genCtx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch content: %w", err)
@@ -131,6 +139,28 @@ func (c *Context) materializeIssues(path string, fetch func() (*utils.IssuesResu
 			File: osdd.FullFileContent_builder{
 				Path:    issuePath,
 				Content: result.Issues[s.ID],
+			}.Build(),
+		}.Build())
+	}
+
+	return entries, nil
+}
+
+// materializeGitHistory converts a GitHistoryResult into one MaterializedResult_Entry per file.
+// Path is treated as a folder: files are written to <path>/<file.Name>.
+func (c *Context) materializeGitHistory(path string, fetch func() (*utils.GitHistoryResult, error)) ([]*osdd.MaterializedResult_Entry, error) {
+	result, err := fetch()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch git history: %w", err)
+	}
+
+	entries := make([]*osdd.MaterializedResult_Entry, 0, len(result.Files))
+	for _, f := range result.Files {
+		filePath := path + "/" + f.Name
+		entries = append(entries, osdd.MaterializedResult_Entry_builder{
+			File: osdd.FullFileContent_builder{
+				Path:    filePath,
+				Content: f.Content,
 			}.Build(),
 		}.Build())
 	}

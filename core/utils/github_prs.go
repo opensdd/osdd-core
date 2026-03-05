@@ -39,6 +39,43 @@ type prReview struct {
 	Body   string
 }
 
+// isInDateRange returns true if the PR's created or updated time falls within
+// [sinceTime, untilTime). If untilTime is zero, only the lower bound is checked.
+func isInDateRange(createdAt, updatedAt, sinceTime, untilTime time.Time) bool {
+	// Both timestamps entirely after the range — skip.
+	if !untilTime.IsZero() && createdAt.After(untilTime) && updatedAt.After(untilTime) {
+		return false
+	}
+
+	if (createdAt.Equal(sinceTime) || createdAt.After(sinceTime)) &&
+		(untilTime.IsZero() || createdAt.Before(untilTime)) {
+		return true
+	}
+	if (updatedAt.Equal(sinceTime) || updatedAt.After(sinceTime)) &&
+		(untilTime.IsZero() || updatedAt.Before(untilTime)) {
+		return true
+	}
+	return false
+}
+
+// resolvePRDateRange computes sinceTime and untilTime from a DatesFilter,
+// applying defaults when fields are absent.
+func resolvePRDateRange(dateFilter *osdd.DatesFilter) (sinceTime, untilTime time.Time) {
+	if dateFilter != nil {
+		if dateFilter.HasFrom() {
+			sinceTime = dateFilter.GetFrom().AsTime().UTC()
+		}
+		if dateFilter.HasTo() {
+			// Make "to" inclusive by adding one day.
+			untilTime = dateFilter.GetTo().AsTime().UTC().AddDate(0, 0, 1)
+		}
+	}
+	if sinceTime.IsZero() {
+		sinceTime = time.Now().AddDate(0, 0, -defaultSinceDays).UTC()
+	}
+	return sinceTime, untilTime
+}
+
 // newGitHubClient creates a go-github Client, optionally authenticated
 // and optionally pointed at a custom base URL (for tests).
 func newGitHubClient(token string) *github.Client {
@@ -57,24 +94,11 @@ func newGitHubClient(token string) *github.Client {
 	return client
 }
 
-// fetchGitHubPRs fetches pull requests from the GitHub API using go-github,
+// fetchGitHubPRs fetches pull requests from the GitHub REST API using go-github,
 // including reviews and diffs, filtered by the given date range.
 func fetchGitHubPRs(ctx context.Context, owner, repo, token string, dateFilter *osdd.DatesFilter) ([]pullRequest, error) {
+	sinceTime, untilTime := resolvePRDateRange(dateFilter)
 	client := newGitHubClient(token)
-
-	var sinceTime, untilTime time.Time
-	if dateFilter != nil {
-		if dateFilter.HasFrom() {
-			sinceTime = dateFilter.GetFrom().AsTime().UTC()
-		}
-		if dateFilter.HasTo() {
-			// Make "to" inclusive by adding one day.
-			untilTime = dateFilter.GetTo().AsTime().UTC().AddDate(0, 0, 1)
-		}
-	}
-	if sinceTime.IsZero() {
-		sinceTime = time.Now().AddDate(0, 0, -defaultSinceDays).UTC()
-	}
 
 	opts := &github.PullRequestListOptions{
 		State:     "all",
@@ -105,24 +129,12 @@ func fetchGitHubPRs(ctx context.Context, owner, repo, token string, dateFilter *
 			createdAt := pr.GetCreatedAt().Time
 			updatedAt := pr.GetUpdatedAt().Time
 
-			if !untilTime.IsZero() && createdAt.After(untilTime) && updatedAt.After(untilTime) {
-				continue
-			}
 			if updatedAt.Before(sinceTime) {
 				pastRange = true
 				break
 			}
 
-			inRange := false
-			if (createdAt.Equal(sinceTime) || createdAt.After(sinceTime)) &&
-				(untilTime.IsZero() || createdAt.Before(untilTime)) {
-				inRange = true
-			}
-			if (updatedAt.Equal(sinceTime) || updatedAt.After(sinceTime)) &&
-				(untilTime.IsZero() || updatedAt.Before(untilTime)) {
-				inRange = true
-			}
-			if !inRange {
+			if !isInDateRange(createdAt, updatedAt, sinceTime, untilTime) {
 				continue
 			}
 

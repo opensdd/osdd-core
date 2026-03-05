@@ -78,33 +78,63 @@ func FetchGitHistory(ctx context.Context, src *recipes.GitHistorySource, token s
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	slog.Debug("Cloning repo for git history", "repo", fullName, "dest", tmpDir)
-	if err := CloneGitRepo(ctx, repo, tmpDir, token); err != nil {
-		return nil, fmt.Errorf("failed to clone repo: %w", err)
+	// Run clone+gitlog and PR fetch concurrently.
+	type commitResult struct {
+		commits []parsedCommit
+		err     error
+	}
+	type prResult struct {
+		prs []pullRequest
+		err error
 	}
 
-	// Run git log.
-	logOutput, err := runGitLog(ctx, tmpDir, sinceDate, untilDate)
-	if err != nil {
-		return nil, fmt.Errorf("failed to run git log: %w", err)
-	}
+	commitCh := make(chan commitResult, 1)
+	prCh := make(chan prResult, 1)
 
-	commits := parseGitLog(logOutput)
-	slog.Debug("Parsed commits", "count", len(commits))
+	// Goroutine 1: clone + git log.
+	go func() {
+		slog.Debug("Cloning repo for git history", "repo", fullName, "dest", tmpDir)
+		cloneOpts := &CloneOptions{Bare: true, ShallowSince: sinceDate}
+		if err := CloneGitRepo(ctx, repo, tmpDir, token, cloneOpts); err != nil {
+			commitCh <- commitResult{err: fmt.Errorf("failed to clone repo: %w", err)}
+			return
+		}
+		logOutput, err := runGitLog(ctx, tmpDir, sinceDate, untilDate)
+		if err != nil {
+			commitCh <- commitResult{err: fmt.Errorf("failed to run git log: %w", err)}
+			return
+		}
+		commits := parseGitLog(logOutput)
+		slog.Debug("Parsed commits", "count", len(commits))
+		commitCh <- commitResult{commits: commits}
+	}()
 
-	// Fetch PRs.
-	provider := strings.ToLower(strings.TrimSpace(repo.GetProvider()))
-	var dateFilter *osdd.DatesFilter
-	if src.HasDateFilter() {
-		dateFilter = src.GetDateFilter()
+	// Goroutine 2: fetch PRs (via API, no clone needed).
+	go func() {
+		provider := strings.ToLower(strings.TrimSpace(repo.GetProvider()))
+		var dateFilter *osdd.DatesFilter
+		if src.HasDateFilter() {
+			dateFilter = src.GetDateFilter()
+		}
+		prs, err := fetchPRs(ctx, provider, fullName, token, dateFilter)
+		if err != nil {
+			slog.Warn("Failed to fetch PRs, continuing with commits only", "error", err)
+			prCh <- prResult{}
+			return
+		}
+		slog.Debug("Fetched PRs", "count", len(prs))
+		prCh <- prResult{prs: prs}
+	}()
+
+	// Collect results.
+	cr := <-commitCh
+	if cr.err != nil {
+		return nil, cr.err
 	}
-	prs, err := fetchPRs(ctx, provider, fullName, token, dateFilter)
-	if err != nil {
-		slog.Warn("Failed to fetch PRs, continuing with commits only", "er"+
-			"ror", err)
-		prs = nil
-	}
-	slog.Debug("Fetched PRs", "count", len(prs))
+	commits := cr.commits
+
+	pr := <-prCh
+	prs := pr.prs
 
 	// Commits: batched by token limit.
 	commitItems := formatCommits(commits)

@@ -60,18 +60,7 @@ func fetchBitbucketPRs(ctx context.Context, workspace, repoSlug, token string, d
 		baseURL = bitbucketDefaultBaseURL
 	}
 
-	var sinceTime, untilTime time.Time
-	if dateFilter != nil {
-		if dateFilter.HasFrom() {
-			sinceTime = dateFilter.GetFrom().AsTime().UTC()
-		}
-		if dateFilter.HasTo() {
-			untilTime = dateFilter.GetTo().AsTime().UTC().AddDate(0, 0, 1)
-		}
-	}
-	if sinceTime.IsZero() {
-		sinceTime = time.Now().AddDate(0, 0, -defaultSinceDays).UTC()
-	}
+	sinceTime, untilTime := resolvePRDateRange(dateFilter)
 
 	// Phase 1: collect PR metadata from paginated list.
 	var allPRs []pullRequest
@@ -92,24 +81,7 @@ func fetchBitbucketPRs(ctx context.Context, workspace, repoSlug, token string, d
 			createdOn, _ := time.Parse(time.RFC3339, pr.CreatedOn)
 			updatedOn, _ := time.Parse(time.RFC3339, pr.UpdatedOn)
 
-			// Filter by date range.
-			if !untilTime.IsZero() && createdOn.After(untilTime) && updatedOn.After(untilTime) {
-				continue
-			}
-			if updatedOn.Before(sinceTime) && createdOn.Before(sinceTime) {
-				continue
-			}
-
-			inRange := false
-			if (createdOn.Equal(sinceTime) || createdOn.After(sinceTime)) &&
-				(untilTime.IsZero() || createdOn.Before(untilTime)) {
-				inRange = true
-			}
-			if (updatedOn.Equal(sinceTime) || updatedOn.After(sinceTime)) &&
-				(untilTime.IsZero() || updatedOn.Before(untilTime)) {
-				inRange = true
-			}
-			if !inRange {
+			if !isInDateRange(createdOn, updatedOn, sinceTime, untilTime) {
 				continue
 			}
 

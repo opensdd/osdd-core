@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/opensdd/osdd-api/clients/go/osdd"
 	"github.com/opensdd/osdd-api/clients/go/osdd/recipes"
@@ -28,18 +29,47 @@ func (c *Context) Materialize(ctx context.Context, contextMsg *recipes.Context, 
 		return osdd.MaterializedResult_builder{}.Build(), nil
 	}
 
-	var resultEntries []*osdd.MaterializedResult_Entry
-
+	// Filter entries by IDE before parallelizing.
+	var filtered []*recipes.ContextEntry
 	for _, entry := range entries {
 		ideFilter := entry.GetFilter().GetIde()
 		if len(ideFilter) > 0 && genCtx.IDE != "" && !slices.Contains(ideFilter, genCtx.IDE) {
 			continue
 		}
-		materialized, err := c.materializeEntry(ctx, entry, genCtx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to materialize entry for path %s: %w", entry.GetPath(), err)
+		filtered = append(filtered, entry)
+	}
+
+	// Materialize entries in parallel with bounded concurrency.
+	const maxConcurrency = 5
+	type indexedResult struct {
+		index   int
+		entries []*osdd.MaterializedResult_Entry
+		err     error
+	}
+
+	results := make([]indexedResult, len(filtered))
+	sem := make(chan struct{}, maxConcurrency)
+	var wg sync.WaitGroup
+
+	for i, entry := range filtered {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int, entry *recipes.ContextEntry) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			materialized, err := c.materializeEntry(ctx, entry, genCtx)
+			results[i] = indexedResult{index: i, entries: materialized, err: err}
+		}(i, entry)
+	}
+	wg.Wait()
+
+	// Collect results in order; fail on first error.
+	var resultEntries []*osdd.MaterializedResult_Entry
+	for _, r := range results {
+		if r.err != nil {
+			return nil, fmt.Errorf("failed to materialize entry for path %s: %w", filtered[r.index].GetPath(), r.err)
 		}
-		resultEntries = append(resultEntries, materialized...)
+		resultEntries = append(resultEntries, r.entries...)
 	}
 
 	return osdd.MaterializedResult_builder{
@@ -179,7 +209,7 @@ func (c *Context) materializeGitRepo(ctx context.Context, entry *recipes.Context
 
 	repo := entry.GetFrom().GetGitRepo()
 	token := resolveAuthToken(repo.GetAuthTokenEnvVar(), genCtx)
-	if err := utils.CloneGitRepo(ctx, repo, destPath, token); err != nil {
+	if err := utils.CloneGitRepo(ctx, repo, destPath, token, nil); err != nil {
 		return nil, fmt.Errorf("failed to clone git repository: %w", err)
 	}
 

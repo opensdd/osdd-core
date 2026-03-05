@@ -231,3 +231,53 @@ func TestFetchGitHubPRs_EmptyResponse(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, prs)
 }
+
+func TestIsInDateRange(t *testing.T) {
+	since := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
+	until := time.Date(2025, 7, 1, 0, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name      string
+		created   time.Time
+		updated   time.Time
+		wantMatch bool
+	}{
+		{
+			name:      "both in range",
+			created:   time.Date(2025, 6, 15, 0, 0, 0, 0, time.UTC),
+			updated:   time.Date(2025, 6, 16, 0, 0, 0, 0, time.UTC),
+			wantMatch: true,
+		},
+		{
+			name:      "created before updated in range",
+			created:   time.Date(2025, 5, 1, 0, 0, 0, 0, time.UTC),
+			updated:   time.Date(2025, 6, 15, 0, 0, 0, 0, time.UTC),
+			wantMatch: true,
+		},
+		{
+			name:      "both before range",
+			created:   time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+			updated:   time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC),
+			wantMatch: false,
+		},
+		{
+			name:      "both after range",
+			created:   time.Date(2025, 8, 1, 0, 0, 0, 0, time.UTC),
+			updated:   time.Date(2025, 8, 2, 0, 0, 0, 0, time.UTC),
+			wantMatch: false,
+		},
+		{
+			name:      "exact since boundary",
+			created:   since,
+			updated:   since,
+			wantMatch: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isInDateRange(tt.created, tt.updated, since, until)
+			assert.Equal(t, tt.wantMatch, got)
+		})
+	}
+}

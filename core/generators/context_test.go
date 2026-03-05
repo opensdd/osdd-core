@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/opensdd/osdd-api/clients/go/osdd"
@@ -913,4 +914,100 @@ func TestContext_MaterializeGitHistory_FetchError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to fetch git history")
 	assert.Contains(t, err.Error(), "clone failed")
+}
+
+// --- Parallel materialization tests ---
+
+func TestContext_Materialize_ParallelOrderPreservation(t *testing.T) {
+	t.Parallel()
+	c := &Context{}
+
+	// Create 10 text entries — result order must match input order.
+	var entries []*recipes.ContextEntry
+	for i := range 10 {
+		entries = append(entries, contextEntry(
+			fmt.Sprintf("file-%02d.txt", i),
+			textFrom(fmt.Sprintf("content-%02d", i)),
+		))
+	}
+
+	ctx := recipes.Context_builder{Entries: entries}.Build()
+	result, err := c.Materialize(context.Background(), ctx, &core.GenerationContext{})
+	require.NoError(t, err)
+
+	resultEntries := result.GetEntries()
+	require.Len(t, resultEntries, 10)
+	for i, entry := range resultEntries {
+		require.True(t, entry.HasFile())
+		assert.Equal(t, fmt.Sprintf("file-%02d.txt", i), entry.GetFile().GetPath())
+		assert.Equal(t, fmt.Sprintf("content-%02d", i), entry.GetFile().GetContent())
+	}
+}
+
+func TestContext_Materialize_ParallelErrorPropagation(t *testing.T) {
+	t.Parallel()
+	c := &Context{}
+
+	// Mix valid entries with one that will fail (empty path in entry source).
+	entries := []*recipes.ContextEntry{
+		contextEntry("a.txt", textFrom("aaa")),
+		contextEntry("b.txt", textFrom("bbb")),
+		// This entry has a source that will fail (git repo with empty name).
+		recipes.ContextEntry_builder{
+			Path: "bad.txt",
+			From: recipes.ContextFrom_builder{
+				GitRepo: osdd.GitRepository_builder{Provider: "github"}.Build(),
+			}.Build(),
+		}.Build(),
+		contextEntry("c.txt", textFrom("ccc")),
+	}
+
+	ctx := recipes.Context_builder{Entries: entries}.Build()
+	_, err := c.Materialize(context.Background(), ctx, &core.GenerationContext{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to materialize entry for path bad.txt")
+}
+
+func TestContext_Materialize_ParallelConcurrency(t *testing.T) {
+	t.Parallel()
+	c := &Context{}
+
+	// Track peak concurrency via an HTTP server that each entry hits.
+	var peak atomic.Int32
+	var current atomic.Int32
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := current.Add(1)
+		for {
+			old := peak.Load()
+			if n <= old || peak.CompareAndSwap(old, n) {
+				break
+			}
+		}
+		// Small busy-wait to create overlap between concurrent requests.
+		for j := 0; j < 1_000_000; j++ {
+			_ = j
+		}
+		current.Add(-1)
+		_, _ = fmt.Fprintf(w, "response")
+	}))
+	defer server.Close()
+
+	// Use github (HTTP) entries so each one hits the test server.
+	n := 10
+	entries := make([]*recipes.ContextEntry, n)
+	for i := range entries {
+		entries[i] = contextEntry(
+			fmt.Sprintf("file-%02d.txt", i),
+			githubFrom(server.URL+fmt.Sprintf("/%d", i)),
+		)
+	}
+
+	ctx := recipes.Context_builder{Entries: entries}.Build()
+	result, err := c.Materialize(context.Background(), ctx, &core.GenerationContext{})
+	require.NoError(t, err)
+	assert.Len(t, result.GetEntries(), n)
+
+	// With parallelism, peak concurrent requests should exceed 1.
+	assert.Greater(t, peak.Load(), int32(1), "expected concurrent execution of entries")
 }

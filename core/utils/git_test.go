@@ -83,40 +83,9 @@ func TestBuildGitCloneURL(t *testing.T) {
 	}
 }
 
-func TestBuildCloneArgs(t *testing.T) {
-	tests := []struct {
-		name string
-		opts *CloneOptions
-		want []string
-	}{
-		{
-			name: "nil options",
-			opts: nil,
-			want: []string{"clone", "https://example.com/repo.git", "/tmp/dest"},
-		},
-		{
-			name: "shallow-since",
-			opts: &CloneOptions{ShallowSince: "2025-01-15"},
-			want: []string{"clone", "--shallow-since=2025-01-15", "https://example.com/repo.git", "/tmp/dest"},
-		},
-		{
-			name: "empty options struct",
-			opts: &CloneOptions{},
-			want: []string{"clone", "https://example.com/repo.git", "/tmp/dest"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := buildCloneArgs(tt.opts, "https://example.com/repo.git", "/tmp/dest")
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
 func TestCloneGitRepo(t *testing.T) {
 	t.Run("nil repo", func(t *testing.T) {
-		err := CloneGitRepo(context.Background(), nil, t.TempDir(), "", nil)
+		err := CloneGitRepo(context.Background(), nil, t.TempDir(), "")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "git repository cannot be nil")
 	})
@@ -124,7 +93,7 @@ func TestCloneGitRepo(t *testing.T) {
 	t.Run("invalid url causes clone failure", func(t *testing.T) {
 		repo := osdd.GitRepository_builder{FullName: "nonexistent/repo-that-does-not-exist-anywhere-99999", Provider: "github"}.Build()
 		dest := filepath.Join(t.TempDir(), "clone-target")
-		err := CloneGitRepo(context.Background(), repo, dest, "", nil)
+		err := CloneGitRepo(context.Background(), repo, dest, "")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "git clone failed")
 	})

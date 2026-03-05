@@ -43,15 +43,9 @@ func BuildGitCloneURL(repo *osdd.GitRepository, token string) (string, error) {
 	return fmt.Sprintf("https://%s/%s.git", host, fullName), nil
 }
 
-// CloneOptions configures the behaviour of CloneGitRepo.
-type CloneOptions struct {
-	ShallowSince string // e.g. "2006-01-02"
-}
-
 // CloneGitRepo clones the repository described by repo into destPath using the git CLI.
 // The token is embedded in the clone URL when non-empty.
-// When opts is nil, a full (non-bare) clone is performed.
-func CloneGitRepo(ctx context.Context, repo *osdd.GitRepository, destPath string, token string, opts *CloneOptions) error {
+func CloneGitRepo(ctx context.Context, repo *osdd.GitRepository, destPath string, token string) error {
 	if repo == nil {
 		return fmt.Errorf("git repository cannot be nil")
 	}
@@ -63,8 +57,7 @@ func CloneGitRepo(ctx context.Context, repo *osdd.GitRepository, destPath string
 
 	slog.Debug("Cloning git repository", "fullName", repo.GetFullName(), "provider", repo.GetProvider(), "dest", destPath)
 
-	args := buildCloneArgs(opts, url, destPath)
-	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd := exec.CommandContext(ctx, "git", "clone", url, destPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git clone failed: %w (output: %s)", err, string(output))
@@ -72,16 +65,4 @@ func CloneGitRepo(ctx context.Context, repo *osdd.GitRepository, destPath string
 
 	slog.Debug("Git clone successful", "dest", destPath)
 	return nil
-}
-
-// buildCloneArgs constructs the argument list for `git clone`.
-func buildCloneArgs(opts *CloneOptions, cloneURL, destPath string) []string {
-	args := []string{"clone"}
-	if opts != nil {
-		if opts.ShallowSince != "" {
-			args = append(args, "--shallow-since="+opts.ShallowSince)
-		}
-	}
-	args = append(args, cloneURL, destPath)
-	return args
 }

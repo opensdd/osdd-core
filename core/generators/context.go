@@ -209,7 +209,7 @@ func (c *Context) materializeGitRepo(ctx context.Context, entry *recipes.Context
 
 	repo := entry.GetFrom().GetGitRepo()
 	token := resolveAuthToken(repo.GetAuthTokenEnvVar(), genCtx)
-	if err := utils.CloneGitRepo(ctx, repo, destPath, token, nil); err != nil {
+	if err := utils.CloneGitRepo(ctx, repo, destPath, token); err != nil {
 		return nil, fmt.Errorf("failed to clone git repository: %w", err)
 	}
 

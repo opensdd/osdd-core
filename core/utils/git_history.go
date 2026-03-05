@@ -94,8 +94,7 @@ func FetchGitHistory(ctx context.Context, src *recipes.GitHistorySource, token s
 	// Goroutine 1: clone + git log.
 	go func() {
 		slog.Debug("Cloning repo for git history", "repo", fullName, "dest", tmpDir)
-		cloneOpts := &CloneOptions{ShallowSince: sinceDate}
-		if err := CloneGitRepo(ctx, repo, tmpDir, token, cloneOpts); err != nil {
+		if err := CloneGitRepo(ctx, repo, tmpDir, token); err != nil {
 			commitCh <- commitResult{err: fmt.Errorf("failed to clone repo: %w", err)}
 			return
 		}

@@ -4,7 +4,7 @@ go 1.25
 
 require (
 	github.com/google/go-github/v83 v83.0.0
-	github.com/opensdd/osdd-api/clients/go v0.8.1
+	github.com/opensdd/osdd-api/clients/go v0.8.2
 	github.com/pkoukk/tiktoken-go v0.1.8
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/protobuf v1.36.10

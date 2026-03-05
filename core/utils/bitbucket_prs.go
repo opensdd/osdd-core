@@ -54,7 +54,7 @@ type bitbucketComment struct {
 
 // fetchBitbucketPRs fetches pull requests from the Bitbucket REST API,
 // including comments and diffs, filtered by the given date range.
-func fetchBitbucketPRs(ctx context.Context, workspace, repoSlug, token string, dateFilter *osdd.DatesFilter) ([]pullRequest, error) {
+func fetchBitbucketPRs(ctx context.Context, workspace, repoSlug, token string, dateFilter *osdd.DatesFilter, summaryOnly bool) ([]pullRequest, error) {
 	baseURL := bitbucketAPIBaseURL
 	if baseURL == "" {
 		baseURL = bitbucketDefaultBaseURL
@@ -100,21 +100,24 @@ func fetchBitbucketPRs(ctx context.Context, workspace, repoSlug, token string, d
 	}
 
 	// Phase 2: fetch comments and diffs in parallel (max 5 concurrent).
-	fetchPRDetails(ctx, allPRs, func(ctx context.Context, pr *pullRequest) {
-		comments, err := fetchBitbucketComments(ctx, baseURL, workspace, repoSlug, pr.Number, token)
-		if err != nil {
-			slog.Warn("Failed to fetch comments for Bitbucket PR", "id", pr.Number, "error", err)
-		} else {
-			pr.Reviews = comments
-		}
+	// When summaryOnly is true, skip fetching details since they won't be used.
+	if !summaryOnly {
+		fetchPRDetails(ctx, allPRs, func(ctx context.Context, pr *pullRequest) {
+			comments, err := fetchBitbucketComments(ctx, baseURL, workspace, repoSlug, pr.Number, token)
+			if err != nil {
+				slog.Warn("Failed to fetch comments for Bitbucket PR", "id", pr.Number, "error", err)
+			} else {
+				pr.Reviews = comments
+			}
 
-		diff, err := fetchBitbucketDiff(ctx, baseURL, workspace, repoSlug, pr.Number, token)
-		if err != nil {
-			slog.Warn("Failed to fetch diff for Bitbucket PR", "id", pr.Number, "error", err)
-		} else {
-			pr.Diff = diff
-		}
-	})
+			diff, err := fetchBitbucketDiff(ctx, baseURL, workspace, repoSlug, pr.Number, token)
+			if err != nil {
+				slog.Warn("Failed to fetch diff for Bitbucket PR", "id", pr.Number, "error", err)
+			} else {
+				pr.Diff = diff
+			}
+		})
+	}
 
 	slog.Debug("Bitbucket PRs fetched", "count", len(allPRs))
 	return allPRs, nil

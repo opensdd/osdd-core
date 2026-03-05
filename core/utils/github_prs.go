@@ -96,7 +96,7 @@ func newGitHubClient(token string) *github.Client {
 
 // fetchGitHubPRs fetches pull requests from the GitHub REST API using go-github,
 // including reviews and diffs, filtered by the given date range.
-func fetchGitHubPRs(ctx context.Context, owner, repo, token string, dateFilter *osdd.DatesFilter) ([]pullRequest, error) {
+func fetchGitHubPRs(ctx context.Context, owner, repo, token string, dateFilter *osdd.DatesFilter, summaryOnly bool) ([]pullRequest, error) {
 	sinceTime, untilTime := resolvePRDateRange(dateFilter)
 	client := newGitHubClient(token)
 
@@ -156,23 +156,26 @@ func fetchGitHubPRs(ctx context.Context, owner, repo, token string, dateFilter *
 	}
 
 	// Phase 2: fetch reviews and diffs in parallel (max 5 concurrent).
-	fetchPRDetails(ctx, allPRs, func(ctx context.Context, pr *pullRequest) {
-		slog.Debug("Fetching PR details", "repo", owner+"/"+repo, "pr", pr.Number, "title", pr.Title)
+	// When summaryOnly is true, skip fetching details since they won't be used.
+	if !summaryOnly {
+		fetchPRDetails(ctx, allPRs, func(ctx context.Context, pr *pullRequest) {
+			slog.Debug("Fetching PR details", "repo", owner+"/"+repo, "pr", pr.Number, "title", pr.Title)
 
-		reviews, err := fetchGitHubReviews(ctx, client, owner, repo, pr.Number)
-		if err != nil {
-			slog.Warn("Failed to fetch reviews for PR", "number", pr.Number, "error", err)
-		} else {
-			pr.Reviews = reviews
-		}
+			reviews, err := fetchGitHubReviews(ctx, client, owner, repo, pr.Number)
+			if err != nil {
+				slog.Warn("Failed to fetch reviews for PR", "number", pr.Number, "error", err)
+			} else {
+				pr.Reviews = reviews
+			}
 
-		diff, err := fetchGitHubDiff(ctx, client, owner, repo, pr.Number)
-		if err != nil {
-			slog.Warn("Failed to fetch diff for PR", "number", pr.Number, "error", err)
-		} else {
-			pr.Diff = diff
-		}
-	})
+			diff, err := fetchGitHubDiff(ctx, client, owner, repo, pr.Number)
+			if err != nil {
+				slog.Warn("Failed to fetch diff for PR", "number", pr.Number, "error", err)
+			} else {
+				pr.Diff = diff
+			}
+		})
+	}
 
 	slog.Debug("GitHub PRs fetched", "count", len(allPRs))
 	return allPRs, nil

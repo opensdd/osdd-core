@@ -160,7 +160,7 @@ func TestFormatCommit(t *testing.T) {
 		},
 	}
 
-	items := formatCommits(commits)
+	items := formatCommits(commits, false)
 	require.Len(t, items, 1)
 	assert.Contains(t, items[0].Content, "## Commit abc123")
 	assert.Contains(t, items[0].Content, "**Author:** Alice <alice@example.com>")
@@ -186,7 +186,7 @@ func TestFormatOnePR(t *testing.T) {
 		},
 	}
 
-	content := formatOnePR(pr)
+	content := formatOnePR(pr, false)
 	assert.Contains(t, content, "## PR #42: Add feature X")
 	assert.Contains(t, content, "**Author:** alice")
 	assert.Contains(t, content, "**State:** closed")
@@ -269,4 +269,54 @@ func TestFetchGitHistory_SkipBoth(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Empty(t, result.Files, "both skipped should produce no files")
+}
+
+func TestFormatCommits_SummaryOnly(t *testing.T) {
+	t.Parallel()
+
+	commits := []parsedCommit{
+		{
+			Hash:    "abc123",
+			Author:  "Alice <alice@example.com>",
+			Date:    "2025-06-15T10:00:00+00:00",
+			Message: "Fix the widget",
+			Diff:    "+func Fix() {}",
+		},
+	}
+
+	items := formatCommits(commits, true)
+	require.Len(t, items, 1)
+	assert.Contains(t, items[0].Content, "## Commit abc123")
+	assert.Contains(t, items[0].Content, "**Author:** Alice")
+	assert.Contains(t, items[0].Content, "**Date:** 2025-06-15")
+	assert.Contains(t, items[0].Content, "Fix the widget")
+	assert.NotContains(t, items[0].Content, "### Diff")
+	assert.NotContains(t, items[0].Content, "+func Fix() {}")
+}
+
+func TestFormatOnePR_SummaryOnly(t *testing.T) {
+	t.Parallel()
+
+	pr := pullRequest{
+		Number: 42,
+		Title:  "Add feature X",
+		Author: "alice",
+		State:  "closed",
+		Body:   "This adds feature X.",
+		Diff:   "+feature code",
+		Reviews: []prReview{
+			{Author: "bob", State: "APPROVED", Body: "Looks good!"},
+		},
+	}
+
+	content := formatOnePR(pr, true)
+	assert.Contains(t, content, "## PR #42: Add feature X")
+	assert.Contains(t, content, "**Author:** alice")
+	assert.Contains(t, content, "**State:** closed")
+	assert.Contains(t, content, "### Description")
+	assert.Contains(t, content, "This adds feature X.")
+	assert.NotContains(t, content, "### Reviews")
+	assert.NotContains(t, content, "bob")
+	assert.NotContains(t, content, "### Diff")
+	assert.NotContains(t, content, "+feature code")
 }

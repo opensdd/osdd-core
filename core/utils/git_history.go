@@ -70,6 +70,7 @@ func FetchGitHistory(ctx context.Context, src *recipes.GitHistorySource, token s
 
 	skipCommits := src.GetSkipCommits()
 	skipPRs := src.GetSkipPrs()
+	summaryOnly := src.GetCommitSummaryOnly()
 
 	// Determine date range.
 	sinceDate, untilDate := resolveDateRange(src)
@@ -105,7 +106,7 @@ func FetchGitHistory(ctx context.Context, src *recipes.GitHistorySource, token s
 			commitCh <- commitResult{err: fmt.Errorf("failed to clone repo: %w", err)}
 			return
 		}
-		logOutput, err := runGitLog(ctx, tmpDir, sinceDate, untilDate)
+		logOutput, err := runGitLog(ctx, tmpDir, sinceDate, untilDate, summaryOnly)
 		if err != nil {
 			commitCh <- commitResult{err: fmt.Errorf("failed to run git log: %w", err)}
 			return
@@ -126,7 +127,7 @@ func FetchGitHistory(ctx context.Context, src *recipes.GitHistorySource, token s
 		if src.HasDateFilter() {
 			dateFilter = src.GetDateFilter()
 		}
-		prs, err := fetchPRs(ctx, provider, fullName, token, dateFilter)
+		prs, err := fetchPRs(ctx, provider, fullName, token, dateFilter, summaryOnly)
 		if err != nil {
 			slog.Warn("Failed to fetch PRs, continuing with commits only", "error", err)
 			prCh <- prResult{}
@@ -149,7 +150,7 @@ func FetchGitHistory(ctx context.Context, src *recipes.GitHistorySource, token s
 	// Commits: batched by token limit.
 	var files []GitHistoryFile
 	if !skipCommits {
-		commitItems := formatCommits(commits)
+		commitItems := formatCommits(commits, summaryOnly)
 		files = append(files, splitByTokenLimit(commitItems, maxTokens, "commits")...)
 	}
 
@@ -158,7 +159,7 @@ func FetchGitHistory(ctx context.Context, src *recipes.GitHistorySource, token s
 		for _, pr := range prs {
 			files = append(files, GitHistoryFile{
 				Name:    fmt.Sprintf("prs/PR-%d.md", pr.Number),
-				Content: formatOnePR(pr),
+				Content: formatOnePR(pr, summaryOnly),
 			})
 		}
 	}
@@ -180,8 +181,11 @@ func resolveDateRange(src *recipes.GitHistorySource) (since, until string) {
 	return since, until
 }
 
-func runGitLog(ctx context.Context, repoDir, since, until string) (string, error) {
-	args := []string{"log", "--format=" + gitLogFormat, "-p", "--since=" + since}
+func runGitLog(ctx context.Context, repoDir, since, until string, summaryOnly bool) (string, error) {
+	args := []string{"log", "--format=" + gitLogFormat, "--since=" + since}
+	if !summaryOnly {
+		args = append(args, "-p")
+	}
 	if until != "" {
 		args = append(args, "--until="+until)
 	}
@@ -262,7 +266,7 @@ func parseOneCommit(raw string) parsedCommit {
 	return c
 }
 
-func fetchPRs(ctx context.Context, provider, fullName, token string, dateFilter *osdd.DatesFilter) ([]pullRequest, error) {
+func fetchPRs(ctx context.Context, provider, fullName, token string, dateFilter *osdd.DatesFilter, summaryOnly bool) ([]pullRequest, error) {
 	parts := strings.SplitN(fullName, "/", 2)
 	if len(parts) != 2 {
 		return nil, fmt.Errorf("invalid full_name %q: expected owner/repo", fullName)
@@ -271,15 +275,15 @@ func fetchPRs(ctx context.Context, provider, fullName, token string, dateFilter 
 
 	switch provider {
 	case "", "github":
-		return fetchGitHubPRs(ctx, owner, repo, token, dateFilter)
+		return fetchGitHubPRs(ctx, owner, repo, token, dateFilter, summaryOnly)
 	case "bitbucket":
-		return fetchBitbucketPRs(ctx, owner, repo, token, dateFilter)
+		return fetchBitbucketPRs(ctx, owner, repo, token, dateFilter, summaryOnly)
 	default:
 		return nil, fmt.Errorf("unsupported provider for PR fetching: %s", provider)
 	}
 }
 
-func formatCommits(commits []parsedCommit) []formattedItem {
+func formatCommits(commits []parsedCommit, summaryOnly bool) []formattedItem {
 	items := make([]formattedItem, 0, len(commits))
 	for _, c := range commits {
 		var sb strings.Builder
@@ -289,7 +293,7 @@ func formatCommits(commits []parsedCommit) []formattedItem {
 		if c.Message != "" {
 			sb.WriteString(fmt.Sprintf("### Message\n\n%s\n\n", c.Message))
 		}
-		if c.Diff != "" {
+		if !summaryOnly && c.Diff != "" {
 			sb.WriteString("### Diff\n\n```diff\n")
 			sb.WriteString(c.Diff)
 			sb.WriteString("\n```\n\n")
@@ -303,7 +307,8 @@ func formatCommits(commits []parsedCommit) []formattedItem {
 }
 
 // formatOnePR formats a single pull request as a standalone markdown document.
-func formatOnePR(pr pullRequest) string {
+// When summaryOnly is true, diffs and reviews are omitted.
+func formatOnePR(pr pullRequest, summaryOnly bool) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("## PR #%d: %s\n\n", pr.Number, pr.Title))
 	sb.WriteString(fmt.Sprintf("**Author:** %s\n", pr.Author))
@@ -313,7 +318,7 @@ func formatOnePR(pr pullRequest) string {
 	if pr.Body != "" {
 		sb.WriteString(fmt.Sprintf("### Description\n\n%s\n\n", pr.Body))
 	}
-	if len(pr.Reviews) > 0 {
+	if !summaryOnly && len(pr.Reviews) > 0 {
 		sb.WriteString("### Reviews\n\n")
 		for _, r := range pr.Reviews {
 			sb.WriteString(fmt.Sprintf("- **%s** (%s)", r.Author, r.State))
@@ -324,7 +329,7 @@ func formatOnePR(pr pullRequest) string {
 		}
 		sb.WriteString("\n")
 	}
-	if pr.Diff != "" {
+	if !summaryOnly && pr.Diff != "" {
 		sb.WriteString("### Diff\n\n```diff\n")
 		sb.WriteString(pr.Diff)
 		sb.WriteString("\n```\n\n")

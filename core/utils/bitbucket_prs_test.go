@@ -74,7 +74,7 @@ func TestFetchBitbucketPRs_Success(t *testing.T) {
 		To:   timestamppb.New(time.Date(2025, 6, 30, 0, 0, 0, 0, time.UTC)),
 	}.Build()
 
-	prs, err := fetchBitbucketPRs(t.Context(), "ws", "repo", "test-token", df)
+	prs, err := fetchBitbucketPRs(t.Context(), "ws", "repo", "test-token", df, false)
 	require.NoError(t, err)
 	require.Len(t, prs, 1)
 
@@ -137,7 +137,7 @@ func TestFetchBitbucketPRs_DateFiltering(t *testing.T) {
 		To:   timestamppb.New(time.Date(2025, 6, 30, 0, 0, 0, 0, time.UTC)),
 	}.Build()
 
-	prs, err := fetchBitbucketPRs(t.Context(), "ws", "repo", "", df)
+	prs, err := fetchBitbucketPRs(t.Context(), "ws", "repo", "", df, false)
 	require.NoError(t, err)
 	require.Len(t, prs, 1)
 	assert.Equal(t, "In range", prs[0].Title)
@@ -183,7 +183,7 @@ func TestFetchBitbucketPRs_Pagination(t *testing.T) {
 
 	serverURL = withBitbucketServer(t, mux)
 
-	prs, err := fetchBitbucketPRs(t.Context(), "ws", "repo", "", nil)
+	prs, err := fetchBitbucketPRs(t.Context(), "ws", "repo", "", nil, false)
 	require.NoError(t, err)
 	assert.Equal(t, 2, callCount)
 	assert.Len(t, prs, 2)
@@ -198,7 +198,7 @@ func TestFetchBitbucketPRs_HTTPError(t *testing.T) {
 
 	withBitbucketServer(t, mux)
 
-	_, err := fetchBitbucketPRs(t.Context(), "ws", "repo", "bad-token", nil)
+	_, err := fetchBitbucketPRs(t.Context(), "ws", "repo", "bad-token", nil, false)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "bitbucket API returned status 401")
 }

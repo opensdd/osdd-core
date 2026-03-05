@@ -75,7 +75,7 @@ func TestFetchGitHubPRs_Success(t *testing.T) {
 		To:   timestamppb.New(time.Date(2025, 6, 30, 0, 0, 0, 0, time.UTC)),
 	}.Build()
 
-	prs, err := fetchGitHubPRs(t.Context(), "owner", "repo", "test-token", df)
+	prs, err := fetchGitHubPRs(t.Context(), "owner", "repo", "test-token", df, false)
 	require.NoError(t, err)
 	require.Len(t, prs, 1)
 
@@ -133,7 +133,7 @@ func TestFetchGitHubPRs_DateFiltering(t *testing.T) {
 		To:   timestamppb.New(time.Date(2025, 6, 30, 0, 0, 0, 0, time.UTC)),
 	}.Build()
 
-	prs, err := fetchGitHubPRs(t.Context(), "owner", "repo", "", df)
+	prs, err := fetchGitHubPRs(t.Context(), "owner", "repo", "", df, false)
 	require.NoError(t, err)
 	require.Len(t, prs, 1)
 	assert.Equal(t, "In range", prs[0].Title)
@@ -182,7 +182,7 @@ func TestFetchGitHubPRs_Pagination(t *testing.T) {
 
 	withGitHubServer(t, mux)
 
-	prs, err := fetchGitHubPRs(t.Context(), "owner", "repo", "", nil)
+	prs, err := fetchGitHubPRs(t.Context(), "owner", "repo", "", nil, false)
 	require.NoError(t, err)
 	assert.Equal(t, 2, callCount)
 	assert.Len(t, prs, 101)
@@ -199,7 +199,7 @@ func TestFetchGitHubPRs_EmptyToken(t *testing.T) {
 
 	withGitHubServer(t, mux)
 
-	_, err := fetchGitHubPRs(t.Context(), "owner", "repo", "", nil)
+	_, err := fetchGitHubPRs(t.Context(), "owner", "repo", "", nil, false)
 	require.NoError(t, err)
 	assert.Empty(t, receivedAuth)
 }
@@ -213,7 +213,7 @@ func TestFetchGitHubPRs_HTTPError(t *testing.T) {
 
 	withGitHubServer(t, mux)
 
-	_, err := fetchGitHubPRs(t.Context(), "owner", "repo", "token", nil)
+	_, err := fetchGitHubPRs(t.Context(), "owner", "repo", "token", nil, false)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "403")
 }
@@ -227,9 +227,51 @@ func TestFetchGitHubPRs_EmptyResponse(t *testing.T) {
 
 	withGitHubServer(t, mux)
 
-	prs, err := fetchGitHubPRs(t.Context(), "owner", "repo", "", nil)
+	prs, err := fetchGitHubPRs(t.Context(), "owner", "repo", "", nil, false)
 	require.NoError(t, err)
 	assert.Empty(t, prs)
+}
+
+func TestFetchGitHubPRs_SummaryOnlySkipsDetails(t *testing.T) {
+	detailsCalled := false
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("GET /repos/owner/repo/pulls", func(w http.ResponseWriter, r *http.Request) {
+		prs := []*github.PullRequest{
+			{
+				Number:    github.Ptr(1),
+				Title:     github.Ptr("PR One"),
+				State:     github.Ptr("closed"),
+				CreatedAt: ghTimestamp(time.Date(2025, 6, 15, 0, 0, 0, 0, time.UTC)),
+				UpdatedAt: ghTimestamp(time.Date(2025, 6, 16, 0, 0, 0, 0, time.UTC)),
+				User:      &github.User{Login: github.Ptr("alice")},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(prs)
+	})
+
+	// Reviews and diff endpoints should NOT be called.
+	mux.HandleFunc("GET /repos/owner/repo/pulls/", func(w http.ResponseWriter, r *http.Request) {
+		detailsCalled = true
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte("[]"))
+	})
+
+	withGitHubServer(t, mux)
+
+	df := osdd.DatesFilter_builder{
+		From: timestamppb.New(time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)),
+		To:   timestamppb.New(time.Date(2025, 6, 30, 0, 0, 0, 0, time.UTC)),
+	}.Build()
+
+	prs, err := fetchGitHubPRs(t.Context(), "owner", "repo", "", df, true)
+	require.NoError(t, err)
+	require.Len(t, prs, 1)
+	assert.Equal(t, "PR One", prs[0].Title)
+	assert.Empty(t, prs[0].Reviews)
+	assert.Empty(t, prs[0].Diff)
+	assert.False(t, detailsCalled, "reviews/diff endpoints should not be called when summaryOnly=true")
 }
 
 func TestIsInDateRange(t *testing.T) {

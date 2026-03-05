@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/opensdd/osdd-api/clients/go/osdd"
@@ -207,4 +208,65 @@ func TestCountTokens(t *testing.T) {
 
 	// Empty string should have zero tokens.
 	assert.Equal(t, 0, countTokens(""))
+}
+
+func TestFetchGitHistory_SkipCommits(t *testing.T) {
+	t.Parallel()
+
+	// With skip_commits=true, no clone should happen.
+	// Use a nonexistent repo — if clone were attempted it would fail.
+	src := recipes.GitHistorySource_builder{
+		Repo: osdd.GitRepository_builder{
+			FullName: "nonexistent/repo-that-does-not-exist-99999",
+			Provider: "github",
+		}.Build(),
+		SkipCommits: true,
+	}.Build()
+
+	result, err := FetchGitHistory(t.Context(), src, "")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	// No commit files should be present.
+	for _, f := range result.Files {
+		assert.False(t, strings.HasPrefix(f.Name, "commits"), "unexpected commit file: %s", f.Name)
+	}
+}
+
+func TestFetchGitHistory_SkipPRs(t *testing.T) {
+	t.Parallel()
+
+	// With skip_prs=true, no PR files should be produced.
+	// Use a nonexistent repo — clone will fail, but that's the commits side.
+	// We also skip commits to avoid the clone.
+	src := recipes.GitHistorySource_builder{
+		Repo: osdd.GitRepository_builder{
+			FullName: "nonexistent/repo-that-does-not-exist-99999",
+			Provider: "github",
+		}.Build(),
+		SkipCommits: true,
+		SkipPrs:     true,
+	}.Build()
+
+	result, err := FetchGitHistory(t.Context(), src, "")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Empty(t, result.Files)
+}
+
+func TestFetchGitHistory_SkipBoth(t *testing.T) {
+	t.Parallel()
+
+	src := recipes.GitHistorySource_builder{
+		Repo: osdd.GitRepository_builder{
+			FullName: "nonexistent/repo-99999",
+			Provider: "github",
+		}.Build(),
+		SkipCommits: true,
+		SkipPrs:     true,
+	}.Build()
+
+	result, err := FetchGitHistory(t.Context(), src, "")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Empty(t, result.Files, "both skipped should produce no files")
 }

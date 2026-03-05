@@ -68,17 +68,13 @@ func FetchGitHistory(ctx context.Context, src *recipes.GitHistorySource, token s
 		maxTokens = defaultMaxFileTokens
 	}
 
+	skipCommits := src.GetSkipCommits()
+	skipPRs := src.GetSkipPrs()
+
 	// Determine date range.
 	sinceDate, untilDate := resolveDateRange(src)
 
-	// Clone into a temp dir.
-	tmpDir, err := os.MkdirTemp("", "git-history-*")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create temp dir: %w", err)
-	}
-	defer func() { _ = os.RemoveAll(tmpDir) }()
-
-	// Run clone+gitlog and PR fetch concurrently.
+	// Run commit fetch (clone+gitlog) and PR fetch concurrently.
 	type commitResult struct {
 		commits []parsedCommit
 		err     error
@@ -91,8 +87,19 @@ func FetchGitHistory(ctx context.Context, src *recipes.GitHistorySource, token s
 	commitCh := make(chan commitResult, 1)
 	prCh := make(chan prResult, 1)
 
-	// Goroutine 1: clone + git log.
+	// Goroutine 1: clone + git log (skipped entirely when skipCommits is set).
 	go func() {
+		if skipCommits {
+			commitCh <- commitResult{}
+			return
+		}
+		tmpDir, err := os.MkdirTemp("", "git-history-*")
+		if err != nil {
+			commitCh <- commitResult{err: fmt.Errorf("failed to create temp dir: %w", err)}
+			return
+		}
+		defer func() { _ = os.RemoveAll(tmpDir) }()
+
 		slog.Debug("Cloning repo for git history", "repo", fullName, "dest", tmpDir)
 		if err := CloneGitRepo(ctx, repo, tmpDir, token); err != nil {
 			commitCh <- commitResult{err: fmt.Errorf("failed to clone repo: %w", err)}
@@ -108,8 +115,12 @@ func FetchGitHistory(ctx context.Context, src *recipes.GitHistorySource, token s
 		commitCh <- commitResult{commits: commits}
 	}()
 
-	// Goroutine 2: fetch PRs (via API, no clone needed).
+	// Goroutine 2: fetch PRs via API (skipped when skipPRs is set).
 	go func() {
+		if skipPRs {
+			prCh <- prResult{}
+			return
+		}
 		provider := strings.ToLower(strings.TrimSpace(repo.GetProvider()))
 		var dateFilter *osdd.DatesFilter
 		if src.HasDateFilter() {
@@ -136,16 +147,20 @@ func FetchGitHistory(ctx context.Context, src *recipes.GitHistorySource, token s
 	prs := pr.prs
 
 	// Commits: batched by token limit.
-	commitItems := formatCommits(commits)
 	var files []GitHistoryFile
-	files = append(files, splitByTokenLimit(commitItems, maxTokens, "commits")...)
+	if !skipCommits {
+		commitItems := formatCommits(commits)
+		files = append(files, splitByTokenLimit(commitItems, maxTokens, "commits")...)
+	}
 
 	// PRs: one file per PR.
-	for _, pr := range prs {
-		files = append(files, GitHistoryFile{
-			Name:    fmt.Sprintf("prs/PR-%d.md", pr.Number),
-			Content: formatOnePR(pr),
-		})
+	if !skipPRs {
+		for _, pr := range prs {
+			files = append(files, GitHistoryFile{
+				Name:    fmt.Sprintf("prs/PR-%d.md", pr.Number),
+				Content: formatOnePR(pr),
+			})
+		}
 	}
 
 	return &GitHistoryResult{Files: files}, nil

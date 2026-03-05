@@ -95,19 +95,9 @@ func TestBuildCloneArgs(t *testing.T) {
 			want: []string{"clone", "https://example.com/repo.git", "/tmp/dest"},
 		},
 		{
-			name: "bare only",
-			opts: &CloneOptions{Bare: true},
-			want: []string{"clone", "--bare", "https://example.com/repo.git", "/tmp/dest"},
-		},
-		{
-			name: "shallow-since only",
+			name: "shallow-since",
 			opts: &CloneOptions{ShallowSince: "2025-01-15"},
 			want: []string{"clone", "--shallow-since=2025-01-15", "https://example.com/repo.git", "/tmp/dest"},
-		},
-		{
-			name: "bare and shallow-since",
-			opts: &CloneOptions{Bare: true, ShallowSince: "2025-06-01"},
-			want: []string{"clone", "--bare", "--shallow-since=2025-06-01", "https://example.com/repo.git", "/tmp/dest"},
 		},
 		{
 			name: "empty options struct",

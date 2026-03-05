@@ -45,7 +45,6 @@ func BuildGitCloneURL(repo *osdd.GitRepository, token string) (string, error) {
 
 // CloneOptions configures the behaviour of CloneGitRepo.
 type CloneOptions struct {
-	Bare         bool
 	ShallowSince string // e.g. "2006-01-02"
 }
 
@@ -79,9 +78,6 @@ func CloneGitRepo(ctx context.Context, repo *osdd.GitRepository, destPath string
 func buildCloneArgs(opts *CloneOptions, cloneURL, destPath string) []string {
 	args := []string{"clone"}
 	if opts != nil {
-		if opts.Bare {
-			args = append(args, "--bare")
-		}
 		if opts.ShallowSince != "" {
 			args = append(args, "--shallow-since="+opts.ShallowSince)
 		}

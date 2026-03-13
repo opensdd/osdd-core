@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/opensdd/osdd-api/clients/go/osdd"
 	"github.com/opensdd/osdd-api/clients/go/osdd/recipes"
@@ -88,6 +89,11 @@ func (c *Context) materializeEntry(ctx context.Context, entry *recipes.ContextEn
 	}
 
 	from := entry.GetFrom()
+
+	// URL fetch entries download bytes directly to disk.
+	if from.WhichType() == recipes.ContextFrom_UrlFetch_case {
+		return c.materializeUrlFetch(ctx, entry, genCtx)
+	}
 
 	// GitRepo entries clone a full repository to disk and return a Directory entry.
 	if from.WhichType() == recipes.ContextFrom_GitRepo_case {
@@ -216,6 +222,102 @@ func (c *Context) materializeGitRepo(ctx context.Context, entry *recipes.Context
 	return osdd.MaterializedResult_Entry_builder{
 		Directory: &path,
 	}.Build(), nil
+}
+
+// urlFetchMaxAttempts is the maximum number of fetch attempts for URL context entries.
+var urlFetchMaxAttempts = 3
+
+// urlFetchBackoffBase is the base duration for exponential backoff between retry attempts.
+var urlFetchBackoffBase = time.Second
+
+// urlFetchBackoff returns the backoff duration for the given attempt (0-indexed).
+func urlFetchBackoff(attempt int) time.Duration {
+	return time.Duration(1<<uint(attempt)) * urlFetchBackoffBase // 1x, 2x, 4x base
+}
+
+func (c *Context) materializeUrlFetch(ctx context.Context, entry *recipes.ContextEntry, genCtx *core.GenerationContext) ([]*osdd.MaterializedResult_Entry, error) {
+	src := entry.GetFrom().GetUrlFetch()
+	rawURL := src.GetUrl()
+	optional := src.GetOptional()
+	path := entry.GetPath()
+
+	slog.Debug("Fetching URL context", "url", rawURL, "path", path, "optional", optional)
+
+	// Validate URL — validation errors always fail, regardless of optional.
+	if err := utils.ValidateURL(rawURL); err != nil {
+		return nil, err
+	}
+
+	// Validate destination path against workspace root.
+	if genCtx == nil || genCtx.WorkspacePath == "" {
+		return nil, fmt.Errorf("workspace path is required for url fetch")
+	}
+	destPath := filepath.Join(genCtx.WorkspacePath, filepath.Clean(path))
+	if !core.IsPathWithinRoot(genCtx.WorkspacePath, destPath) {
+		return nil, fmt.Errorf("destination path escapes workspace: %s", path)
+	}
+
+	// Retry loop.
+	var data []byte
+	var lastErr error
+	for attempt := range urlFetchMaxAttempts {
+		data, lastErr = utils.FetchURL(ctx, rawURL)
+		if lastErr == nil {
+			break
+		}
+		if ctx.Err() != nil {
+			lastErr = fmt.Errorf("context cancelled while fetching url %s for path %s: %w", rawURL, path, ctx.Err())
+			break
+		}
+		if attempt < urlFetchMaxAttempts-1 {
+			slog.Debug("Retrying URL fetch", "url", rawURL, "attempt", attempt+1, "error", lastErr)
+			select {
+			case <-ctx.Done():
+				return nil, fmt.Errorf("context cancelled while fetching url %s for path %s: %w", rawURL, path, ctx.Err())
+			case <-time.After(urlFetchBackoff(attempt)):
+			}
+		}
+	}
+
+	if lastErr != nil {
+		if optional {
+			slog.Warn("URL fetch failed, skipping optional entry", "url", rawURL, "path", path, "error", lastErr)
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to fetch url %s for path %s: %w", rawURL, path, lastErr)
+	}
+
+	// Atomic write: temp file → rename.
+	dir := filepath.Dir(destPath)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, fmt.Errorf("failed to create directories for %s: %w", destPath, err)
+	}
+
+	tmpFile, err := os.CreateTemp(dir, ".url-fetch-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp file in %s: %w", dir, err)
+	}
+	tmpPath := tmpFile.Name()
+
+	if _, err := tmpFile.Write(data); err != nil {
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpPath)
+		return nil, fmt.Errorf("failed to write temp file %s: %w", tmpPath, err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return nil, fmt.Errorf("failed to close temp file %s: %w", tmpPath, err)
+	}
+
+	if err := os.Rename(tmpPath, destPath); err != nil {
+		_ = os.Remove(tmpPath)
+		return nil, fmt.Errorf("failed to rename temp file to %s: %w", destPath, err)
+	}
+
+	slog.Debug("URL content written", "url", rawURL, "path", path, "bytes", len(data))
+
+	// File is already on disk; return no entries to avoid PersistMaterializedResult overwriting.
+	return nil, nil
 }
 
 func (c *Context) fetchContent(ctx context.Context, from *recipes.ContextFrom, genCtx *core.GenerationContext) (string, error) {

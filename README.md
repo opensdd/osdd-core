@@ -1,5 +1,7 @@
 # Core libraries supporting OpenSDD
 
+THIS IS JUST FOR TESTING
+
 ## Integration Tests
 
 Integration tests require credentials and are skipped by default (they run when `-short` is not set).

@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/opensdd/osdd-api/clients/go/osdd"
 	"github.com/opensdd/osdd-api/clients/go/osdd/recipes"
@@ -1010,4 +1013,310 @@ func TestContext_Materialize_ParallelConcurrency(t *testing.T) {
 
 	// With parallelism, peak concurrent requests should exceed 1.
 	assert.Greater(t, peak.Load(), int32(1), "expected concurrent execution of entries")
+}
+
+// --- URL fetch context tests ---
+
+func urlFetchFrom(url string, optional bool) *recipes.ContextFrom {
+	return recipes.ContextFrom_builder{
+		UrlFetch: recipes.UrlSource_builder{
+			Url:      url,
+			Optional: optional,
+		}.Build(),
+	}.Build()
+}
+
+func TestContext_MaterializeUrlFetch_Success(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("downloaded content"))
+	}))
+	defer server.Close()
+
+	workspace := t.TempDir()
+	c := &Context{}
+	entry := contextEntry("subdir/output.txt", urlFetchFrom(server.URL+"/file", false))
+	genCtx := &core.GenerationContext{WorkspacePath: workspace}
+
+	entries, err := c.materializeEntry(context.Background(), entry, genCtx)
+	require.NoError(t, err)
+	assert.Nil(t, entries) // file written directly to disk
+
+	content, err := os.ReadFile(filepath.Join(workspace, "subdir", "output.txt"))
+	require.NoError(t, err)
+	assert.Equal(t, "downloaded content", string(content))
+}
+
+func TestContext_MaterializeUrlFetch_BinaryContent(t *testing.T) {
+	t.Parallel()
+
+	binaryData := []byte{0x00, 0x01, 0xFF, 0xFE, 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(binaryData)
+	}))
+	defer server.Close()
+
+	workspace := t.TempDir()
+	c := &Context{}
+	entry := contextEntry("image.png", urlFetchFrom(server.URL, false))
+	genCtx := &core.GenerationContext{WorkspacePath: workspace}
+
+	_, err := c.materializeEntry(context.Background(), entry, genCtx)
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(filepath.Join(workspace, "image.png"))
+	require.NoError(t, err)
+	assert.Equal(t, binaryData, content)
+}
+
+func TestContext_MaterializeUrlFetch_EmptyURL(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	c := &Context{}
+	entry := contextEntry("out.txt", urlFetchFrom("", false))
+	genCtx := &core.GenerationContext{WorkspacePath: workspace}
+
+	_, err := c.materializeEntry(context.Background(), entry, genCtx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "url cannot be empty")
+}
+
+func TestContext_MaterializeUrlFetch_InvalidScheme(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	c := &Context{}
+	entry := contextEntry("out.txt", urlFetchFrom("ftp://example.com/file", false))
+	genCtx := &core.GenerationContext{WorkspacePath: workspace}
+
+	_, err := c.materializeEntry(context.Background(), entry, genCtx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "url scheme must be http or https")
+}
+
+func TestContext_MaterializeUrlFetch_PathTraversal(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	c := &Context{}
+	entry := contextEntry("../../../etc/passwd", urlFetchFrom("http://example.com/data", false))
+	genCtx := &core.GenerationContext{WorkspacePath: workspace}
+
+	_, err := c.materializeEntry(context.Background(), entry, genCtx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "destination path escapes workspace")
+}
+
+func TestContext_MaterializeUrlFetch_Overwrite(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("new content"))
+	}))
+	defer server.Close()
+
+	workspace := t.TempDir()
+
+	// Write existing file.
+	err := os.WriteFile(filepath.Join(workspace, "existing.txt"), []byte("old content"), 0o644)
+	require.NoError(t, err)
+
+	c := &Context{}
+	entry := contextEntry("existing.txt", urlFetchFrom(server.URL, false))
+	genCtx := &core.GenerationContext{WorkspacePath: workspace}
+
+	_, err = c.materializeEntry(context.Background(), entry, genCtx)
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(filepath.Join(workspace, "existing.txt"))
+	require.NoError(t, err)
+	assert.Equal(t, "new content", string(content))
+}
+
+func TestContext_MaterializeUrlFetch_RequiredFailure(t *testing.T) {
+	// Not parallel: modifies package-level vars.
+	oldAttempts := urlFetchMaxAttempts
+	oldBase := urlFetchBackoffBase
+	urlFetchMaxAttempts = 1
+	urlFetchBackoffBase = time.Millisecond
+	defer func() { urlFetchMaxAttempts = oldAttempts; urlFetchBackoffBase = oldBase }()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	workspace := t.TempDir()
+	c := &Context{}
+	entry := contextEntry("out.txt", urlFetchFrom(server.URL, false))
+	genCtx := &core.GenerationContext{WorkspacePath: workspace}
+
+	_, err := c.materializeEntry(context.Background(), entry, genCtx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to fetch url")
+	assert.Contains(t, err.Error(), "out.txt")
+	assert.Contains(t, err.Error(), "status 500")
+}
+
+func TestContext_MaterializeUrlFetch_OptionalFailure(t *testing.T) {
+	// Not parallel: modifies package-level vars.
+	oldAttempts := urlFetchMaxAttempts
+	oldBase := urlFetchBackoffBase
+	urlFetchMaxAttempts = 1
+	urlFetchBackoffBase = time.Millisecond
+	defer func() { urlFetchMaxAttempts = oldAttempts; urlFetchBackoffBase = oldBase }()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	workspace := t.TempDir()
+	c := &Context{}
+	entry := contextEntry("opt.txt", urlFetchFrom(server.URL, true))
+	genCtx := &core.GenerationContext{WorkspacePath: workspace}
+
+	entries, err := c.materializeEntry(context.Background(), entry, genCtx)
+	require.NoError(t, err) // optional — no error returned
+	assert.Nil(t, entries)
+
+	// File should not exist.
+	_, statErr := os.Stat(filepath.Join(workspace, "opt.txt"))
+	assert.True(t, os.IsNotExist(statErr))
+}
+
+func TestContext_MaterializeUrlFetch_RetrySuccess(t *testing.T) {
+	// Not parallel: modifies package-level vars.
+	oldAttempts := urlFetchMaxAttempts
+	oldBase := urlFetchBackoffBase
+	urlFetchMaxAttempts = 3
+	urlFetchBackoffBase = time.Millisecond
+	defer func() { urlFetchMaxAttempts = oldAttempts; urlFetchBackoffBase = oldBase }()
+
+	var callCount atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := callCount.Add(1)
+		if n < 3 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("after retry"))
+	}))
+	defer server.Close()
+
+	workspace := t.TempDir()
+	c := &Context{}
+	entry := contextEntry("retry.txt", urlFetchFrom(server.URL, false))
+	genCtx := &core.GenerationContext{WorkspacePath: workspace}
+
+	_, err := c.materializeEntry(context.Background(), entry, genCtx)
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(filepath.Join(workspace, "retry.txt"))
+	require.NoError(t, err)
+	assert.Equal(t, "after retry", string(content))
+	assert.Equal(t, int32(3), callCount.Load())
+}
+
+func TestContext_Materialize_UrlFetch_ErrorPropagation(t *testing.T) {
+	// Not parallel: modifies package-level vars.
+	oldAttempts := urlFetchMaxAttempts
+	oldBase := urlFetchBackoffBase
+	urlFetchMaxAttempts = 1
+	urlFetchBackoffBase = time.Millisecond
+	defer func() { urlFetchMaxAttempts = oldAttempts; urlFetchBackoffBase = oldBase }()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	workspace := t.TempDir()
+	c := &Context{}
+
+	ctx := recipes.Context_builder{
+		Entries: []*recipes.ContextEntry{
+			contextEntry("fail.txt", urlFetchFrom(server.URL, false)),
+		},
+	}.Build()
+
+	_, err := c.Materialize(context.Background(), ctx, &core.GenerationContext{WorkspacePath: workspace})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to materialize entry for path fail.txt")
+}
+
+func TestContext_Materialize_UrlFetch_OptionalContinues(t *testing.T) {
+	// Not parallel: modifies package-level vars.
+	oldAttempts := urlFetchMaxAttempts
+	oldBase := urlFetchBackoffBase
+	urlFetchMaxAttempts = 1
+	urlFetchBackoffBase = time.Millisecond
+	defer func() { urlFetchMaxAttempts = oldAttempts; urlFetchBackoffBase = oldBase }()
+
+	failServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer failServer.Close()
+
+	workspace := t.TempDir()
+	c := &Context{}
+
+	ctx := recipes.Context_builder{
+		Entries: []*recipes.ContextEntry{
+			contextEntry("first.txt", textFrom("hello")),
+			contextEntry("optional.txt", urlFetchFrom(failServer.URL, true)),
+			contextEntry("last.txt", textFrom("world")),
+		},
+	}.Build()
+
+	result, err := c.Materialize(context.Background(), ctx, &core.GenerationContext{WorkspacePath: workspace})
+	require.NoError(t, err)
+
+	// Should have 2 entries (text entries); optional URL entry produced no entries.
+	resultEntries := result.GetEntries()
+	require.Len(t, resultEntries, 2)
+	assert.Equal(t, "first.txt", resultEntries[0].GetFile().GetPath())
+	assert.Equal(t, "last.txt", resultEntries[1].GetFile().GetPath())
+}
+
+func TestContext_Materialize_UrlFetch_MixedWithText(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("url content"))
+	}))
+	defer server.Close()
+
+	workspace := t.TempDir()
+	c := &Context{}
+
+	ctx := recipes.Context_builder{
+		Entries: []*recipes.ContextEntry{
+			contextEntry("text.txt", textFrom("text content")),
+			contextEntry("url.dat", urlFetchFrom(server.URL, false)),
+		},
+	}.Build()
+
+	result, err := c.Materialize(context.Background(), ctx, &core.GenerationContext{WorkspacePath: workspace})
+	require.NoError(t, err)
+
+	// Text entry produces a MaterializedResult entry; URL entry writes to disk directly.
+	resultEntries := result.GetEntries()
+	require.Len(t, resultEntries, 1)
+	assert.Equal(t, "text.txt", resultEntries[0].GetFile().GetPath())
+	assert.Equal(t, "text content", resultEntries[0].GetFile().GetContent())
+
+	// URL content written directly to disk.
+	content, err := os.ReadFile(filepath.Join(workspace, "url.dat"))
+	require.NoError(t, err)
+	assert.Equal(t, "url content", string(content))
 }

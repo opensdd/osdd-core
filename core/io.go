@@ -50,7 +50,7 @@ func PersistMaterializedResult(_ context.Context, root string, result *osdd.Mate
 					rel = strings.TrimPrefix(rel, string(os.PathSeparator))
 				}
 				full := filepath.Clean(filepath.Join(root, rel))
-				if !isPathWithinRoot(root, full) {
+				if !IsPathWithinRoot(root, full) {
 					return fmt.Errorf("entry %d: directory path escapes root: %s", i, dirPath)
 				}
 				log.Debug("Ensuring directory exists", "dir", full)
@@ -84,7 +84,7 @@ func PersistMaterializedResult(_ context.Context, root string, result *osdd.Mate
 		full = filepath.Clean(full)
 
 		// Ensure the target path is within root (prevent path traversal).
-		if !isPathWithinRoot(root, full) {
+		if !IsPathWithinRoot(root, full) {
 			return fmt.Errorf("entry %d: path escapes root: %s", i, p)
 		}
 
@@ -104,8 +104,8 @@ func PersistMaterializedResult(_ context.Context, root string, result *osdd.Mate
 	return nil
 }
 
-// isPathWithinRoot checks whether target is inside root directory.
-func isPathWithinRoot(root, target string) bool {
+// IsPathWithinRoot checks whether target is inside root directory.
+func IsPathWithinRoot(root, target string) bool {
 	rootClean := filepath.Clean(root)
 	targetClean := filepath.Clean(target)
 

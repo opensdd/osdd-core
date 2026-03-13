@@ -649,3 +649,112 @@ func TestContext_IntegrationTest_GitHistorySource(t *testing.T) {
 			"expected files under git-history/ folder, got %s", e.GetFile().GetPath())
 	}
 }
+
+func TestContext_IntegrationTest_UrlFetchSource(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	t.Parallel()
+
+	workspace := t.TempDir()
+	c := &Context{}
+
+	ctx := recipes.Context_builder{
+		Entries: []*recipes.ContextEntry{
+			recipes.ContextEntry_builder{
+				Path: "example.html",
+				From: recipes.ContextFrom_builder{
+					UrlFetch: recipes.UrlSource_builder{
+						Url: "https://example.com",
+					}.Build(),
+				}.Build(),
+			}.Build(),
+		},
+	}.Build()
+
+	genCtx := &core.GenerationContext{WorkspacePath: workspace}
+	result, err := c.Materialize(context.Background(), ctx, genCtx)
+	require.NoError(t, err)
+
+	// URL fetch writes directly to disk; no MaterializedResult entries returned.
+	assert.Empty(t, result.GetEntries())
+
+	content, err := os.ReadFile(filepath.Join(workspace, "example.html"))
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "Example Domain")
+}
+
+func TestContext_IntegrationTest_UrlFetchMixedWithText(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	t.Parallel()
+
+	workspace := t.TempDir()
+	c := &Context{}
+
+	ctx := recipes.Context_builder{
+		Entries: []*recipes.ContextEntry{
+			recipes.ContextEntry_builder{
+				Path: "intro.txt",
+				From: recipes.ContextFrom_builder{
+					Text: strPtr("hello from text source"),
+				}.Build(),
+			}.Build(),
+			recipes.ContextEntry_builder{
+				Path: "fetched.html",
+				From: recipes.ContextFrom_builder{
+					UrlFetch: recipes.UrlSource_builder{
+						Url: "https://example.com",
+					}.Build(),
+				}.Build(),
+			}.Build(),
+		},
+	}.Build()
+
+	genCtx := &core.GenerationContext{WorkspacePath: workspace}
+	result, err := c.Materialize(context.Background(), ctx, genCtx)
+	require.NoError(t, err)
+
+	// Only the text entry produces a MaterializedResult entry.
+	entries := result.GetEntries()
+	require.Len(t, entries, 1)
+	assert.Equal(t, "intro.txt", entries[0].GetFile().GetPath())
+	assert.Equal(t, "hello from text source", entries[0].GetFile().GetContent())
+
+	// URL entry written to disk.
+	content, err := os.ReadFile(filepath.Join(workspace, "fetched.html"))
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "Example Domain")
+}
+
+func TestContext_IntegrationTest_UrlFetchSubdirectory(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	t.Parallel()
+
+	workspace := t.TempDir()
+	c := &Context{}
+
+	ctx := recipes.Context_builder{
+		Entries: []*recipes.ContextEntry{
+			recipes.ContextEntry_builder{
+				Path: "downloads/pages/example.html",
+				From: recipes.ContextFrom_builder{
+					UrlFetch: recipes.UrlSource_builder{
+						Url: "https://example.com",
+					}.Build(),
+				}.Build(),
+			}.Build(),
+		},
+	}.Build()
+
+	genCtx := &core.GenerationContext{WorkspacePath: workspace}
+	_, err := c.Materialize(context.Background(), ctx, genCtx)
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(filepath.Join(workspace, "downloads", "pages", "example.html"))
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "Example Domain")
+}

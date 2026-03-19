@@ -24,11 +24,18 @@ const linearQuery = `query($filter: IssueFilter, $after: String) {
     nodes {
       identifier
       title
+      url
       description
       state { name }
-      assignee { name }
+      assignee { name email }
+      creator { name email }
+      team { key name }
+      labels { nodes { name } }
+      cycle { name number }
       createdAt
       updatedAt
+      completedAt
+      canceledAt
       priority
       priorityLabel
     }
@@ -59,19 +66,45 @@ type linearIssuesData struct {
 }
 
 type linearIssue struct {
-	Identifier    string      `json:"identifier"`
-	Title         string      `json:"title"`
-	Description   string      `json:"description"`
-	State         *linearName `json:"state"`
-	Assignee      *linearName `json:"assignee"`
-	CreatedAt     string      `json:"createdAt"`
-	UpdatedAt     string      `json:"updatedAt"`
-	Priority      int         `json:"priority"`
-	PriorityLabel string      `json:"priorityLabel"`
+	Identifier    string            `json:"identifier"`
+	Title         string            `json:"title"`
+	URL           string            `json:"url"`
+	Description   string            `json:"description"`
+	State         *linearName       `json:"state"`
+	Assignee      *linearUser       `json:"assignee"`
+	Creator       *linearUser       `json:"creator"`
+	Team          *linearTeam       `json:"team"`
+	Labels        *linearLabelNodes `json:"labels"`
+	Cycle         *linearCycle      `json:"cycle"`
+	CreatedAt     string            `json:"createdAt"`
+	UpdatedAt     string            `json:"updatedAt"`
+	CompletedAt   string            `json:"completedAt"`
+	CanceledAt    string            `json:"canceledAt"`
+	Priority      int               `json:"priority"`
+	PriorityLabel string            `json:"priorityLabel"`
+}
+
+type linearTeam struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
+}
+
+type linearLabelNodes struct {
+	Nodes []linearName `json:"nodes"`
+}
+
+type linearCycle struct {
+	Name   string `json:"name"`
+	Number int    `json:"number"`
 }
 
 type linearName struct {
 	Name string `json:"name"`
+}
+
+type linearUser struct {
+	Name  string `json:"name"`
+	Email string `json:"email,omitempty"`
 }
 
 type linearPageInfo struct {

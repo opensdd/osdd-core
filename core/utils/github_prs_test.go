@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -232,8 +233,9 @@ func TestFetchGitHubPRs_EmptyResponse(t *testing.T) {
 	assert.Empty(t, prs)
 }
 
-func TestFetchGitHubPRs_SummaryOnlySkipsDetails(t *testing.T) {
-	detailsCalled := false
+func TestFetchGitHubPRs_SummaryOnlySkipsReviewsAndDiff(t *testing.T) {
+	reviewsCalled := false
+	diffCalled := false
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /repos/owner/repo/pulls", func(w http.ResponseWriter, r *http.Request) {
@@ -251,9 +253,44 @@ func TestFetchGitHubPRs_SummaryOnlySkipsDetails(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(prs)
 	})
 
-	// Reviews and diff endpoints should NOT be called.
-	mux.HandleFunc("GET /repos/owner/repo/pulls/", func(w http.ResponseWriter, r *http.Request) {
-		detailsCalled = true
+	// Commits endpoint IS expected (for email resolution).
+	mux.HandleFunc("GET /repos/owner/repo/pulls/1/commits", func(w http.ResponseWriter, r *http.Request) {
+		commits := []map[string]any{
+			{
+				"sha":       "abc123",
+				"author":    map[string]any{"login": "alice"},
+				"committer": map[string]any{"login": "alice"},
+				"commit": map[string]any{
+					"author":    map[string]any{"name": "Alice", "email": "alice@example.com"},
+					"committer": map[string]any{"name": "Alice", "email": "alice@example.com"},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(commits)
+	})
+
+	// Individual PR endpoint (for Get call — returns PR JSON with stats).
+	// Diff requests use the same path but with Accept: application/vnd.github.diff.
+	mux.HandleFunc("GET /repos/owner/repo/pulls/1", func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.Header.Get("Accept"), "diff") {
+			diffCalled = true
+			_, _ = w.Write([]byte(""))
+			return
+		}
+		// Return individual PR JSON with merged_by, additions, etc.
+		pr := map[string]any{
+			"number": 1, "title": "PR One", "state": "closed",
+			"additions": 10, "deletions": 5, "changed_files": 2,
+			"user": map[string]any{"login": "alice"},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(pr)
+	})
+
+	// Reviews should NOT be called.
+	mux.HandleFunc("GET /repos/owner/repo/pulls/1/reviews", func(w http.ResponseWriter, r *http.Request) {
+		reviewsCalled = true
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte("[]"))
 	})
@@ -269,9 +306,11 @@ func TestFetchGitHubPRs_SummaryOnlySkipsDetails(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, prs, 1)
 	assert.Equal(t, "PR One", prs[0].Title)
+	assert.Equal(t, "alice@example.com", prs[0].AuthorEmail)
 	assert.Empty(t, prs[0].Reviews)
 	assert.Empty(t, prs[0].Diff)
-	assert.False(t, detailsCalled, "reviews/diff endpoints should not be called when summaryOnly=true")
+	assert.False(t, reviewsCalled, "reviews endpoint should not be called when summaryOnly=true")
+	assert.False(t, diffCalled, "diff endpoint should not be called when summaryOnly=true")
 }
 
 func TestIsInDateRange(t *testing.T) {

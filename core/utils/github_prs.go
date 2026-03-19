@@ -21,22 +21,34 @@ var githubAPIBaseURL string
 
 // pullRequest is the shared PR type used by both GitHub and Bitbucket fetchers.
 type pullRequest struct {
-	Number    int
-	Title     string
-	Author    string
-	State     string
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	Body      string
-	Reviews   []prReview
-	Diff      string
+	Number        int
+	Title         string
+	URL           string
+	Author        string
+	AuthorEmail   string
+	MergedBy      string
+	MergedByEmail string
+	State         string
+	BaseBranch    string
+	HeadBranch    string
+	Labels        []string
+	Additions     int
+	Deletions     int
+	ChangedFiles  int
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	MergedAt      time.Time
+	Body          string
+	Reviews       []prReview
+	Diff          string
 }
 
 // prReview represents a single review on a pull request.
 type prReview struct {
-	Author string
-	State  string
-	Body   string
+	Author      string
+	AuthorEmail string
+	State       string
+	Body        string
 }
 
 // isInDateRange returns true if the PR's created or updated time falls within
@@ -138,15 +150,41 @@ func fetchGitHubPRs(ctx context.Context, owner, repo, token string, dateFilter *
 				continue
 			}
 
-			allPRs = append(allPRs, pullRequest{
-				Number:    pr.GetNumber(),
-				Title:     pr.GetTitle(),
-				Author:    pr.GetUser().GetLogin(),
-				State:     pr.GetState(),
-				CreatedAt: createdAt,
-				UpdatedAt: updatedAt,
-				Body:      pr.GetBody(),
-			})
+			// List endpoint has merged_at but not merged/additions/deletions.
+			state := pr.GetState()
+			var mergedAt time.Time
+			if pr.MergedAt != nil {
+				if t := pr.MergedAt.GetTime(); t != nil {
+					mergedAt = *t
+				}
+				state = "merged"
+			}
+
+			var labels []string
+			for _, l := range pr.Labels {
+				labels = append(labels, l.GetName())
+			}
+
+			p := pullRequest{
+				Number:     pr.GetNumber(),
+				Title:      pr.GetTitle(),
+				URL:        pr.GetHTMLURL(),
+				Author:     pr.GetUser().GetLogin(),
+				State:      state,
+				BaseBranch: pr.GetBase().GetRef(),
+				HeadBranch: pr.GetHead().GetRef(),
+				Labels:     labels,
+				CreatedAt:  createdAt,
+				UpdatedAt:  updatedAt,
+				Body:       pr.GetBody(),
+			}
+			if email := pr.GetUser().GetEmail(); email != "" {
+				p.AuthorEmail = email
+			}
+			if !mergedAt.IsZero() {
+				p.MergedAt = mergedAt
+			}
+			allPRs = append(allPRs, p)
 		}
 
 		if pastRange || resp.NextPage == 0 {
@@ -155,26 +193,70 @@ func fetchGitHubPRs(ctx context.Context, owner, repo, token string, dateFilter *
 		opts.Page = resp.NextPage
 	}
 
-	// Phase 2: fetch reviews and diffs in parallel (max 5 concurrent).
-	// When summaryOnly is true, skip fetching details since they won't be used.
-	if !summaryOnly {
-		fetchPRDetails(ctx, allPRs, func(ctx context.Context, pr *pullRequest) {
-			slog.Debug("Fetching PR details", "repo", owner+"/"+repo, "pr", pr.Number, "title", pr.Title)
-
-			reviews, err := fetchGitHubReviews(ctx, client, owner, repo, pr.Number)
-			if err != nil {
-				slog.Warn("Failed to fetch reviews for PR", "number", pr.Number, "error", err)
-			} else {
-				pr.Reviews = reviews
+	// Phase 2: fetch individual PR details, reviews, diffs, and emails in parallel.
+	var emailStore sync.Map // login → email
+	fetchPRDetails(ctx, allPRs, func(ctx context.Context, pr *pullRequest) {
+		// Fetch individual PR for fields not in list response (merged_by, stats).
+		fullPR, _, err := client.PullRequests.Get(ctx, owner, repo, pr.Number)
+		if err != nil {
+			slog.Debug("Failed to fetch full PR", "number", pr.Number, "error", err)
+		} else {
+			if mb := fullPR.GetMergedBy(); mb != nil {
+				pr.MergedBy = mb.GetLogin()
 			}
+			pr.Additions = fullPR.GetAdditions()
+			pr.Deletions = fullPR.GetDeletions()
+			pr.ChangedFiles = fullPR.GetChangedFiles()
+		}
 
-			diff, err := fetchGitHubDiff(ctx, client, owner, repo, pr.Number)
-			if err != nil {
-				slog.Warn("Failed to fetch diff for PR", "number", pr.Number, "error", err)
-			} else {
-				pr.Diff = diff
+		// Resolve emails from PR commits.
+		emails, err := resolveEmailsFromPRCommits(ctx, client, owner, repo, pr.Number)
+		if err != nil {
+			slog.Debug("Failed to resolve emails from PR commits", "number", pr.Number, "error", err)
+		}
+		for login, email := range emails {
+			emailStore.LoadOrStore(login, email)
+		}
+		if pr.AuthorEmail == "" {
+			pr.AuthorEmail = emails[pr.Author]
+		}
+
+		if summaryOnly {
+			return
+		}
+
+		slog.Debug("Fetching PR details", "repo", owner+"/"+repo, "pr", pr.Number, "title", pr.Title)
+
+		reviews, err := fetchGitHubReviews(ctx, client, owner, repo, pr.Number)
+		if err != nil {
+			slog.Warn("Failed to fetch reviews for PR", "number", pr.Number, "error", err)
+		} else {
+			pr.Reviews = reviews
+		}
+
+		diff, err := fetchGitHubDiff(ctx, client, owner, repo, pr.Number)
+		if err != nil {
+			slog.Warn("Failed to fetch diff for PR", "number", pr.Number, "error", err)
+		} else {
+			pr.Diff = diff
+		}
+	})
+
+	// Build plain map from sync.Map for applying to merged-by / reviewers.
+	emailMap := make(map[string]string)
+	emailStore.Range(func(key, value any) bool {
+		emailMap[key.(string)] = value.(string)
+		return true
+	})
+	for i := range allPRs {
+		if allPRs[i].MergedBy != "" && allPRs[i].MergedByEmail == "" {
+			allPRs[i].MergedByEmail = emailMap[allPRs[i].MergedBy]
+		}
+		for j := range allPRs[i].Reviews {
+			if allPRs[i].Reviews[j].AuthorEmail == "" {
+				allPRs[i].Reviews[j].AuthorEmail = emailMap[allPRs[i].Reviews[j].Author]
 			}
-		})
+		}
 	}
 
 	slog.Debug("GitHub PRs fetched", "count", len(allPRs))
@@ -223,6 +305,48 @@ func fetchGitHubDiff(ctx context.Context, client *github.Client, owner, repo str
 		return "", err
 	}
 	return diff, nil
+}
+
+// resolveEmailsFromPRCommits fetches commits for a PR and builds a login→email
+// map from the git commit metadata. This captures emails for all committers on
+// the PR (author, co-authors), not just the PR opener.
+func resolveEmailsFromPRCommits(ctx context.Context, client *github.Client, owner, repo string, number int) (map[string]string, error) {
+	opts := &github.ListOptions{PerPage: 100}
+	emails := make(map[string]string)
+
+	for {
+		commits, resp, err := client.PullRequests.ListCommits(ctx, owner, repo, number, opts)
+		if err != nil {
+			return emails, err
+		}
+		for _, c := range commits {
+			login := c.GetAuthor().GetLogin()
+			email := c.GetCommit().GetAuthor().GetEmail()
+			if login != "" && email != "" && !isNoReplyEmail(email) {
+				if _, ok := emails[login]; !ok {
+					emails[login] = email
+				}
+			}
+			// Also check committer (may differ from author).
+			cLogin := c.GetCommitter().GetLogin()
+			cEmail := c.GetCommit().GetCommitter().GetEmail()
+			if cLogin != "" && cEmail != "" && !isNoReplyEmail(cEmail) {
+				if _, ok := emails[cLogin]; !ok {
+					emails[cLogin] = cEmail
+				}
+			}
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
+	}
+	return emails, nil
+}
+
+// isNoReplyEmail returns true for GitHub's noreply placeholder emails.
+func isNoReplyEmail(email string) bool {
+	return strings.HasSuffix(email, "@users.noreply.github.com")
 }
 
 func truncateBody(body []byte) string {

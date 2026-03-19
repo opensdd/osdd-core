@@ -38,6 +38,8 @@ func TestFetchBitbucketPRs_Success(t *testing.T) {
 					UpdatedOn:   time.Date(2025, 6, 16, 0, 0, 0, 0, time.UTC).Format(time.RFC3339),
 					Author: struct {
 						DisplayName string `json:"display_name"`
+						Nickname    string `json:"nickname"`
+						AccountID   string `json:"account_id"`
 					}{DisplayName: "Alice"},
 				},
 			},
@@ -81,7 +83,7 @@ func TestFetchBitbucketPRs_Success(t *testing.T) {
 	assert.Equal(t, 1, prs[0].Number)
 	assert.Equal(t, "BB PR One", prs[0].Title)
 	assert.Equal(t, "Alice", prs[0].Author)
-	assert.Equal(t, "MERGED", prs[0].State)
+	assert.Equal(t, "merged", prs[0].State)
 	assert.Equal(t, "First BB PR", prs[0].Body)
 	assert.Contains(t, prs[0].Diff, "+added line")
 
@@ -104,6 +106,8 @@ func TestFetchBitbucketPRs_DateFiltering(t *testing.T) {
 					UpdatedOn: time.Date(2025, 6, 16, 0, 0, 0, 0, time.UTC).Format(time.RFC3339),
 					Author: struct {
 						DisplayName string `json:"display_name"`
+						Nickname    string `json:"nickname"`
+						AccountID   string `json:"account_id"`
 					}{DisplayName: "Alice"},
 				},
 				{
@@ -114,6 +118,8 @@ func TestFetchBitbucketPRs_DateFiltering(t *testing.T) {
 					UpdatedOn: time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC).Format(time.RFC3339),
 					Author: struct {
 						DisplayName string `json:"display_name"`
+						Nickname    string `json:"nickname"`
+						AccountID   string `json:"account_id"`
 					}{DisplayName: "Bob"},
 				},
 			},
@@ -158,6 +164,8 @@ func TestFetchBitbucketPRs_Pagination(t *testing.T) {
 					{ID: 1, Title: "PR 1", State: "OPEN", CreatedOn: now, UpdatedOn: now,
 						Author: struct {
 							DisplayName string `json:"display_name"`
+							Nickname    string `json:"nickname"`
+							AccountID   string `json:"account_id"`
 						}{DisplayName: "user"}},
 				},
 				Next: serverURL + "/repositories/ws/repo/pullrequests?page=2",
@@ -168,6 +176,8 @@ func TestFetchBitbucketPRs_Pagination(t *testing.T) {
 					{ID: 2, Title: "PR 2", State: "MERGED", CreatedOn: now, UpdatedOn: now,
 						Author: struct {
 							DisplayName string `json:"display_name"`
+							Nickname    string `json:"nickname"`
+							AccountID   string `json:"account_id"`
 						}{DisplayName: "user"}},
 				},
 			}

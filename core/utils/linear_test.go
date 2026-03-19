@@ -65,7 +65,7 @@ func TestFetchLinearIssues_Success(t *testing.T) {
 			Title:         "First issue",
 			Description:   "Description of first issue",
 			State:         &linearName{Name: "In Progress"},
-			Assignee:      &linearName{Name: "Bob"},
+			Assignee:      &linearUser{Name: "Bob"},
 			CreatedAt:     "2025-01-15T10:00:00.000Z",
 			UpdatedAt:     "2025-02-01T14:30:00.000Z",
 			Priority:      1,

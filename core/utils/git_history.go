@@ -1,12 +1,14 @@
 package utils
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/opensdd/osdd-api/clients/go/osdd"
@@ -283,58 +285,118 @@ func fetchPRs(ctx context.Context, provider, fullName, token string, dateFilter 
 	}
 }
 
+var commitTmpl = template.Must(template.New("commit").Parse(
+	`## Commit {{.Hash}}
+
+**Author:** {{.Author}}
+**Date:** {{.Date}}
+{{if .Message}}
+### Message
+
+{{.Message}}
+{{end}}{{if .Diff}}
+### Diff
+
+` + "```diff" + `
+{{.Diff}}
+` + "```" + `
+{{end}}`))
+
 func formatCommits(commits []parsedCommit, summaryOnly bool) []formattedItem {
 	items := make([]formattedItem, 0, len(commits))
 	for _, c := range commits {
-		var sb strings.Builder
-		sb.WriteString(fmt.Sprintf("## Commit %s\n\n", c.Hash))
-		sb.WriteString(fmt.Sprintf("**Author:** %s\n", c.Author))
-		sb.WriteString(fmt.Sprintf("**Date:** %s\n\n", c.Date))
-		if c.Message != "" {
-			sb.WriteString(fmt.Sprintf("### Message\n\n%s\n\n", c.Message))
+		data := c
+		if summaryOnly {
+			data.Diff = ""
 		}
-		if !summaryOnly && c.Diff != "" {
-			sb.WriteString("### Diff\n\n```diff\n")
-			sb.WriteString(c.Diff)
-			sb.WriteString("\n```\n\n")
+		var buf bytes.Buffer
+		if err := commitTmpl.Execute(&buf, data); err != nil {
+			slog.Warn("Failed to execute commit template", "hash", c.Hash, "err", err)
+			continue
 		}
 		items = append(items, formattedItem{
 			Label:   c.Hash,
-			Content: sb.String(),
+			Content: buf.String(),
 		})
 	}
 	return items
 }
 
+// prTmplData wraps a pullRequest with a SummaryOnly flag for the template.
+type prTmplData struct {
+	pullRequest
+	SummaryOnly bool
+	CreatedFmt  string
+	UpdatedFmt  string
+	MergedAtFmt string
+}
+
+var prFuncs = template.FuncMap{
+	"join": strings.Join,
+}
+
+var prTmpl = template.Must(template.New("pr").Funcs(prFuncs).Parse(
+	`## PR #{{.Number}}: {{.Title}}
+{{- if .URL}}
+**URL:** {{.URL}}
+{{- end}}
+**Author:** {{.Author}}
+{{- if .AuthorEmail}}
+**Author Email:** {{.AuthorEmail}}
+{{- end}}
+**State:** {{.State}}
+{{- if .MergedBy}}
+**Merged By:** {{.MergedBy}}{{if .MergedByEmail}} ({{.MergedByEmail}}){{end}}
+{{- end}}
+{{- if .MergedAtFmt}}
+**Merged At:** {{.MergedAtFmt}}
+{{- end}}
+{{- if .BaseBranch}}
+**Base Branch:** {{.BaseBranch}}
+{{- end}}
+{{- if .HeadBranch}}
+**Head Branch:** {{.HeadBranch}}
+{{- end}}
+{{- if .Labels}}
+**Labels:** {{join .Labels ", "}}
+{{- end}}
+{{- if or .Additions .Deletions .ChangedFiles}}
+**Changes:** +{{.Additions}} -{{.Deletions}} ({{.ChangedFiles}} files)
+{{- end}}
+**Created:** {{.CreatedFmt}}
+**Updated:** {{.UpdatedFmt}}
+{{if .Body}}
+### Description
+
+{{.Body}}
+{{end}}{{if not .SummaryOnly}}{{if .Reviews}}
+### Reviews
+
+{{range .Reviews}}- **{{.Author}}**{{if .AuthorEmail}} ({{.AuthorEmail}}){{end}} ({{.State}}){{if .Body}}: {{.Body}}{{end}}
+{{end}}{{end}}{{if .Diff}}
+### Diff
+
+` + "```diff" + `
+{{.Diff}}
+` + "```" + `
+{{end}}{{end}}`))
+
 // formatOnePR formats a single pull request as a standalone markdown document.
 // When summaryOnly is true, diffs and reviews are omitted.
 func formatOnePR(pr pullRequest, summaryOnly bool) string {
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("## PR #%d: %s\n\n", pr.Number, pr.Title))
-	sb.WriteString(fmt.Sprintf("**Author:** %s\n", pr.Author))
-	sb.WriteString(fmt.Sprintf("**State:** %s\n", pr.State))
-	sb.WriteString(fmt.Sprintf("**Created:** %s\n", pr.CreatedAt.Format(time.RFC3339)))
-	sb.WriteString(fmt.Sprintf("**Updated:** %s\n\n", pr.UpdatedAt.Format(time.RFC3339)))
-	if pr.Body != "" {
-		sb.WriteString(fmt.Sprintf("### Description\n\n%s\n\n", pr.Body))
+	data := prTmplData{
+		pullRequest: pr,
+		SummaryOnly: summaryOnly,
+		CreatedFmt:  pr.CreatedAt.Format(time.RFC3339),
+		UpdatedFmt:  pr.UpdatedAt.Format(time.RFC3339),
+		MergedAtFmt: formatTimeIfSet(pr.MergedAt),
 	}
-	if !summaryOnly && len(pr.Reviews) > 0 {
-		sb.WriteString("### Reviews\n\n")
-		for _, r := range pr.Reviews {
-			sb.WriteString(fmt.Sprintf("- **%s** (%s)", r.Author, r.State))
-			if r.Body != "" {
-				sb.WriteString(fmt.Sprintf(": %s", r.Body))
-			}
-			sb.WriteString("\n")
-		}
-		sb.WriteString("\n")
+	var buf bytes.Buffer
+	if err := prTmpl.Execute(&buf, data); err != nil {
+		slog.Warn("Failed to execute PR template", "number", pr.Number, "err", err)
+		return ""
 	}
-	if !summaryOnly && pr.Diff != "" {
-		sb.WriteString("### Diff\n\n```diff\n")
-		sb.WriteString(pr.Diff)
-		sb.WriteString("\n```\n\n")
-	}
-	return sb.String()
+	return buf.String()
 }
 
 // splitByTokenLimit groups formatted items into files that stay under maxTokens.
@@ -376,6 +438,13 @@ func splitByTokenLimit(items []formattedItem, maxTokens int, prefix string) []Gi
 	}
 
 	return files
+}
+
+func formatTimeIfSet(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format(time.RFC3339)
 }
 
 // countTokens estimates the number of tokens in text using cl100k_base encoding.

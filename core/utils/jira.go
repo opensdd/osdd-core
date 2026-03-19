@@ -41,22 +41,39 @@ type jiraIssue struct {
 }
 
 type jiraIssueFields struct {
-	Summary     string          `json:"summary"`
-	Description json.RawMessage `json:"description"`
-	Status      jiraName        `json:"status"`
-	Assignee    *jiraAssignee   `json:"assignee"`
-	IssueType   jiraName        `json:"issuetype"`
-	Priority    jiraName        `json:"priority"`
-	Created     string          `json:"created"`
-	Updated     string          `json:"updated"`
+	Summary        string          `json:"summary"`
+	Description    json.RawMessage `json:"description"`
+	Status         jiraName        `json:"status"`
+	Resolution     *jiraName       `json:"resolution"`
+	Assignee       *jiraUser       `json:"assignee"`
+	Reporter       *jiraUser       `json:"reporter"`
+	Creator        *jiraUser       `json:"creator"`
+	IssueType      jiraName        `json:"issuetype"`
+	Priority       jiraName        `json:"priority"`
+	Labels         []string        `json:"labels"`
+	Components     []jiraName      `json:"components"`
+	FixVersions    []jiraName      `json:"fixVersions"`
+	Created        string          `json:"created"`
+	Updated        string          `json:"updated"`
+	ResolutionDate string          `json:"resolutiondate"`
+	Parent         *jiraParent     `json:"parent"`
+}
+
+type jiraParent struct {
+	Key    string `json:"key"`
+	Fields struct {
+		Summary string `json:"summary"`
+	} `json:"fields"`
 }
 
 type jiraName struct {
 	Name string `json:"name"`
 }
 
-type jiraAssignee struct {
-	DisplayName string `json:"displayName"`
+type jiraUser struct {
+	DisplayName  string `json:"displayName"`
+	EmailAddress string `json:"emailAddress,omitempty"`
+	AccountID    string `json:"accountId,omitempty"`
 }
 
 // FetchJiraIssues fetches issues from Jira Cloud using the REST API and returns
@@ -90,7 +107,7 @@ func FetchJiraIssues(ctx context.Context, src *recipes.JiraIssuesSource, token s
 		reqBody := jiraSearchRequest{
 			JQL:           jql,
 			MaxResults:    jiraMaxResults,
-			Fields:        []string{"summary", "description", "status", "assignee", "created", "updated", "issuetype", "priority"},
+			Fields:        []string{"summary", "description", "status", "resolution", "assignee", "reporter", "creator", "created", "updated", "resolutiondate", "issuetype", "priority", "labels", "components", "fixVersions", "parent"},
 			NextPageToken: nextPageToken,
 		}
 

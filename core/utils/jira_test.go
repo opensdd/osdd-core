@@ -62,7 +62,7 @@ func TestFetchJiraIssues_Success(t *testing.T) {
 				Status:    jiraName{Name: "Open"},
 				IssueType: jiraName{Name: "Bug"},
 				Priority:  jiraName{Name: "High"},
-				Assignee:  &jiraAssignee{DisplayName: "Alice"},
+				Assignee:  &jiraUser{DisplayName: "Alice"},
 				Created:   "2025-01-15T10:00:00.000+0000",
 				Updated:   "2025-02-01T14:30:00.000+0000",
 			},

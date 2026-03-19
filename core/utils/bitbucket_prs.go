@@ -33,9 +33,34 @@ type bitbucketPR struct {
 	Description string `json:"description"`
 	CreatedOn   string `json:"created_on"`
 	UpdatedOn   string `json:"updated_on"`
-	Author      struct {
+	ClosedOn    string `json:"closed_on"`
+	MergeCommit *struct {
+		Hash string `json:"hash"`
+	} `json:"merge_commit"`
+	Author struct {
 		DisplayName string `json:"display_name"`
+		Nickname    string `json:"nickname"`
+		AccountID   string `json:"account_id"`
 	} `json:"author"`
+	ClosedBy *struct {
+		DisplayName string `json:"display_name"`
+		Nickname    string `json:"nickname"`
+	} `json:"closed_by"`
+	Source struct {
+		Branch struct {
+			Name string `json:"name"`
+		} `json:"branch"`
+	} `json:"source"`
+	Destination struct {
+		Branch struct {
+			Name string `json:"name"`
+		} `json:"branch"`
+	} `json:"destination"`
+	Links struct {
+		HTML struct {
+			Href string `json:"href"`
+		} `json:"html"`
+	} `json:"links"`
 }
 
 type bitbucketCommentList struct {
@@ -50,6 +75,22 @@ type bitbucketComment struct {
 	User struct {
 		DisplayName string `json:"display_name"`
 	} `json:"user"`
+}
+
+type bitbucketCommitList struct {
+	Values []bitbucketCommit `json:"values"`
+	Next   string            `json:"next"`
+}
+
+type bitbucketCommit struct {
+	Author struct {
+		Raw  string `json:"raw"` // "Name <email>"
+		User struct {
+			DisplayName string `json:"display_name"`
+			Nickname    string `json:"nickname"`
+			AccountID   string `json:"account_id"`
+		} `json:"user"`
+	} `json:"author"`
 }
 
 // fetchBitbucketPRs fetches pull requests from the Bitbucket REST API,
@@ -85,39 +126,77 @@ func fetchBitbucketPRs(ctx context.Context, workspace, repoSlug, token string, d
 				continue
 			}
 
-			allPRs = append(allPRs, pullRequest{
-				Number:    pr.ID,
-				Title:     pr.Title,
-				Author:    pr.Author.DisplayName,
-				State:     pr.State,
-				CreatedAt: createdOn,
-				UpdatedAt: updatedOn,
-				Body:      pr.Description,
-			})
+			author := pr.Author.DisplayName
+			if pr.Author.Nickname != "" && pr.Author.Nickname != author {
+				author += " (" + pr.Author.Nickname + ")"
+			}
+
+			p := pullRequest{
+				Number:     pr.ID,
+				Title:      pr.Title,
+				URL:        pr.Links.HTML.Href,
+				Author:     author,
+				State:      strings.ToLower(pr.State),
+				BaseBranch: pr.Destination.Branch.Name,
+				HeadBranch: pr.Source.Branch.Name,
+				CreatedAt:  createdOn,
+				UpdatedAt:  updatedOn,
+				Body:       pr.Description,
+			}
+			if pr.ClosedOn != "" {
+				if t, err := time.Parse(time.RFC3339, pr.ClosedOn); err == nil && strings.EqualFold(pr.State, "MERGED") {
+					p.MergedAt = t
+				}
+			}
+			if pr.ClosedBy != nil {
+				name := pr.ClosedBy.DisplayName
+				if pr.ClosedBy.Nickname != "" && pr.ClosedBy.Nickname != name {
+					name += " (" + pr.ClosedBy.Nickname + ")"
+				}
+				if strings.EqualFold(pr.State, "MERGED") {
+					p.MergedBy = name
+				}
+			}
+			allPRs = append(allPRs, p)
 		}
 
 		apiURL = prList.Next
 	}
 
-	// Phase 2: fetch comments and diffs in parallel (max 5 concurrent).
-	// When summaryOnly is true, skip fetching details since they won't be used.
-	if !summaryOnly {
-		fetchPRDetails(ctx, allPRs, func(ctx context.Context, pr *pullRequest) {
-			comments, err := fetchBitbucketComments(ctx, baseURL, workspace, repoSlug, pr.Number, token)
-			if err != nil {
-				slog.Warn("Failed to fetch comments for Bitbucket PR", "id", pr.Number, "error", err)
-			} else {
-				pr.Reviews = comments
+	// Phase 2: fetch stats, comments, diffs, and resolve author emails from commits.
+	fetchPRDetails(ctx, allPRs, func(ctx context.Context, pr *pullRequest) {
+		// Resolve author email from PR commits.
+		if pr.AuthorEmail == "" {
+			email := resolveEmailFromBitbucketCommits(ctx, baseURL, workspace, repoSlug, pr.Number, token)
+			if email != "" {
+				pr.AuthorEmail = email
 			}
+		}
 
-			diff, err := fetchBitbucketDiff(ctx, baseURL, workspace, repoSlug, pr.Number, token)
-			if err != nil {
-				slog.Warn("Failed to fetch diff for Bitbucket PR", "id", pr.Number, "error", err)
-			} else {
-				pr.Diff = diff
-			}
-		})
-	}
+		// Fetch diffstat for additions/deletions/changed_files.
+		adds, dels, files := fetchBitbucketDiffstat(ctx, baseURL, workspace, repoSlug, pr.Number, token)
+		pr.Additions = adds
+		pr.Deletions = dels
+		pr.ChangedFiles = files
+
+		if summaryOnly {
+			return
+		}
+
+		comments, err := fetchBitbucketComments(ctx, baseURL, workspace, repoSlug, pr.Number, token)
+		if err != nil {
+			slog.Warn("Failed to fetch comments for Bitbucket PR", "id", pr.Number, "error", err)
+		} else {
+			pr.Reviews = comments
+		}
+
+		diff, err := fetchBitbucketDiff(ctx, baseURL, workspace, repoSlug, pr.Number, token)
+		if err != nil {
+			slog.Warn("Failed to fetch diff for Bitbucket PR", "id", pr.Number, "error", err)
+		} else {
+			pr.Diff = diff
+		}
+	})
 
 	slog.Debug("Bitbucket PRs fetched", "count", len(allPRs))
 	return allPRs, nil
@@ -153,6 +232,72 @@ func fetchBitbucketDiff(ctx context.Context, baseURL, workspace, repoSlug string
 		return "", err
 	}
 	return string(body), nil
+}
+
+type bitbucketDiffstatList struct {
+	Values []bitbucketDiffstatEntry `json:"values"`
+}
+
+type bitbucketDiffstatEntry struct {
+	LinesAdded   int `json:"lines_added"`
+	LinesRemoved int `json:"lines_removed"`
+}
+
+// fetchBitbucketDiffstat fetches the diffstat for a PR and returns
+// total additions, deletions, and number of changed files.
+func fetchBitbucketDiffstat(ctx context.Context, baseURL, workspace, repoSlug string, prID int, token string) (additions, deletions, changedFiles int) {
+	url := fmt.Sprintf("%s/repositories/%s/%s/pullrequests/%d/diffstat", baseURL, workspace, repoSlug, prID)
+	body, err := bitbucketGet(ctx, url, token)
+	if err != nil {
+		slog.Debug("Failed to fetch Bitbucket diffstat", "id", prID, "error", err)
+		return 0, 0, 0
+	}
+
+	var diffstat bitbucketDiffstatList
+	if err := json.Unmarshal(body, &diffstat); err != nil {
+		slog.Debug("Failed to parse Bitbucket diffstat", "id", prID, "error", err)
+		return 0, 0, 0
+	}
+
+	for _, entry := range diffstat.Values {
+		additions += entry.LinesAdded
+		deletions += entry.LinesRemoved
+	}
+	return additions, deletions, len(diffstat.Values)
+}
+
+// resolveEmailFromBitbucketCommits fetches the first page of commits for a PR
+// and extracts the author email from the commit's "raw" field (format: "Name <email>").
+func resolveEmailFromBitbucketCommits(ctx context.Context, baseURL, workspace, repoSlug string, prID int, token string) string {
+	url := fmt.Sprintf("%s/repositories/%s/%s/pullrequests/%d/commits?pagelen=1", baseURL, workspace, repoSlug, prID)
+	body, err := bitbucketGet(ctx, url, token)
+	if err != nil {
+		slog.Debug("Failed to fetch Bitbucket PR commits", "id", prID, "error", err)
+		return ""
+	}
+
+	var commitList bitbucketCommitList
+	if err := json.Unmarshal(body, &commitList); err != nil {
+		slog.Debug("Failed to parse Bitbucket PR commits", "id", prID, "error", err)
+		return ""
+	}
+
+	for _, c := range commitList.Values {
+		if email := parseEmailFromRaw(c.Author.Raw); email != "" {
+			return email
+		}
+	}
+	return ""
+}
+
+// parseEmailFromRaw extracts an email from a git author "raw" string like "Name <email>".
+func parseEmailFromRaw(raw string) string {
+	start := strings.LastIndex(raw, "<")
+	end := strings.LastIndex(raw, ">")
+	if start >= 0 && end > start+1 {
+		return raw[start+1 : end]
+	}
+	return ""
 }
 
 func bitbucketGet(ctx context.Context, url, token string) ([]byte, error) {

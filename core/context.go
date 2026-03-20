@@ -21,6 +21,9 @@ type GenerationContext struct {
 	// OutputCMDOnly indicates whether the generator should only output the command to be executed but not execute it.
 	OutputCMDOnly bool
 
+	// SkipPermissions when true causes IDEs to launch with permission checks bypassed (e.g. Claude receives --dangerously-skip-permissions).
+	SkipPermissions bool
+
 	// WorkspacePath is the resolved workspace root directory for materialization.
 	WorkspacePath string
 

@@ -164,6 +164,22 @@ func TestIDE_Materialize_Command_Github(t *testing.T) {
 	assert.Equal(t, "from github", foundContent)
 }
 
+func TestIDE_PrepareStart_SkipPermissions(t *testing.T) {
+	g := NewIDEProvider()
+
+	props, err := g.PrepareStart(context.Background(), &core.GenerationContext{SkipPermissions: true})
+	require.NoError(t, err)
+	assert.Contains(t, props.ExtraArgs, "--dangerously-skip-permissions")
+}
+
+func TestIDE_PrepareStart_NoSkipPermissions(t *testing.T) {
+	g := NewIDEProvider()
+
+	props, err := g.PrepareStart(context.Background(), &core.GenerationContext{})
+	require.NoError(t, err)
+	assert.Empty(t, props.ExtraArgs)
+}
+
 func strPtr(s string) *string {
 	return &s
 }

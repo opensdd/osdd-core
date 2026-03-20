@@ -8,16 +8,35 @@ import (
 
 	"github.com/opensdd/osdd-api/clients/go/osdd"
 	"github.com/opensdd/osdd-api/clients/go/osdd/recipes"
+	"github.com/opensdd/osdd-core/core"
 	"github.com/opensdd/osdd-core/core/plugins/shared"
 	"github.com/opensdd/osdd-core/core/providers"
 )
 
 func NewIDEProvider() providers.IDE {
-	return &shared.IDE{
+	sh := &shared.IDE{
 		CommandsFolder:     ".claude/commands",
 		MCPServersJSONPath: ".mcp.json",
 		Settings:           &settings{},
 	}
+	return &provider{shared: sh}
+}
+
+type provider struct {
+	shared *shared.IDE
+}
+
+func (p *provider) Materialize(ctx context.Context, genCtx *core.GenerationContext, ide *recipes.Ide) (*osdd.MaterializedResult, error) {
+	return p.shared.Materialize(ctx, genCtx, ide)
+}
+
+func (p *provider) PrepareStart(_ context.Context, genCtx *core.GenerationContext) (core.ExecProps, error) {
+	if genCtx != nil && genCtx.SkipPermissions {
+		return core.ExecProps{
+			ExtraArgs: []string{"--dangerously-skip-permissions"},
+		}, nil
+	}
+	return core.ExecProps{}, nil
 }
 
 type settings struct {

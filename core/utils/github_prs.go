@@ -51,6 +51,16 @@ type prReview struct {
 	Body        string
 }
 
+// prFetchResult bundles the pull requests fetched from an API along with
+// identity metadata discovered during fetching (e.g. login→email mappings
+// resolved from PR commit metadata).
+type prFetchResult struct {
+	PRs []pullRequest
+	// LoginEmails maps GitHub/Bitbucket login → commit-author email,
+	// built from PR commit metadata during fetching.
+	LoginEmails map[string]string
+}
+
 // isInDateRange returns true if the PR's created or updated time falls within
 // [sinceTime, untilTime). If untilTime is zero, only the lower bound is checked.
 func isInDateRange(createdAt, updatedAt, sinceTime, untilTime time.Time) bool {
@@ -108,7 +118,7 @@ func newGitHubClient(token string) *github.Client {
 
 // fetchGitHubPRs fetches pull requests from the GitHub REST API using go-github,
 // including reviews and diffs, filtered by the given date range.
-func fetchGitHubPRs(ctx context.Context, owner, repo, token string, dateFilter *osdd.DatesFilter, summaryOnly bool) ([]pullRequest, error) {
+func fetchGitHubPRs(ctx context.Context, owner, repo, token string, dateFilter *osdd.DatesFilter, summaryOnly bool) (prFetchResult, error) {
 	sinceTime, untilTime := resolvePRDateRange(dateFilter)
 	client := newGitHubClient(token)
 
@@ -129,7 +139,7 @@ func fetchGitHubPRs(ctx context.Context, owner, repo, token string, dateFilter *
 	for {
 		ghPRs, resp, err := client.PullRequests.List(ctx, owner, repo, opts)
 		if err != nil {
-			return nil, fmt.Errorf("failed to list GitHub PRs: %w", err)
+			return prFetchResult{}, fmt.Errorf("failed to list GitHub PRs: %w", err)
 		}
 
 		if len(ghPRs) == 0 {
@@ -260,7 +270,7 @@ func fetchGitHubPRs(ctx context.Context, owner, repo, token string, dateFilter *
 	}
 
 	slog.Debug("GitHub PRs fetched", "count", len(allPRs))
-	return allPRs, nil
+	return prFetchResult{PRs: allPRs, LoginEmails: emailMap}, nil
 }
 
 // fetchPRDetails runs fn for each PR in parallel with bounded concurrency.

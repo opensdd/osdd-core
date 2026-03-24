@@ -95,7 +95,7 @@ type bitbucketCommit struct {
 
 // fetchBitbucketPRs fetches pull requests from the Bitbucket REST API,
 // including comments and diffs, filtered by the given date range.
-func fetchBitbucketPRs(ctx context.Context, workspace, repoSlug, token string, dateFilter *osdd.DatesFilter, summaryOnly bool) ([]pullRequest, error) {
+func fetchBitbucketPRs(ctx context.Context, workspace, repoSlug, token string, dateFilter *osdd.DatesFilter, summaryOnly bool) (prFetchResult, error) {
 	baseURL := bitbucketAPIBaseURL
 	if baseURL == "" {
 		baseURL = bitbucketDefaultBaseURL
@@ -110,12 +110,12 @@ func fetchBitbucketPRs(ctx context.Context, workspace, repoSlug, token string, d
 	for apiURL != "" {
 		body, err := bitbucketGet(ctx, apiURL, token)
 		if err != nil {
-			return nil, fmt.Errorf("failed to list Bitbucket PRs: %w", err)
+			return prFetchResult{}, fmt.Errorf("failed to list Bitbucket PRs: %w", err)
 		}
 
 		var prList bitbucketPRList
 		if err := json.Unmarshal(body, &prList); err != nil {
-			return nil, fmt.Errorf("failed to parse Bitbucket PRs response: %w", err)
+			return prFetchResult{}, fmt.Errorf("failed to parse Bitbucket PRs response: %w", err)
 		}
 
 		for _, pr := range prList.Values {
@@ -199,7 +199,7 @@ func fetchBitbucketPRs(ctx context.Context, workspace, repoSlug, token string, d
 	})
 
 	slog.Debug("Bitbucket PRs fetched", "count", len(allPRs))
-	return allPRs, nil
+	return prFetchResult{PRs: allPRs}, nil
 }
 
 func fetchBitbucketComments(ctx context.Context, baseURL, workspace, repoSlug string, prID int, token string) ([]prReview, error) {

@@ -76,21 +76,21 @@ func TestFetchGitHubPRs_Success(t *testing.T) {
 		To:   timestamppb.New(time.Date(2025, 6, 30, 0, 0, 0, 0, time.UTC)),
 	}.Build()
 
-	prs, err := fetchGitHubPRs(t.Context(), "owner", "repo", "test-token", df, false)
+	result, err := fetchGitHubPRs(t.Context(), "owner", "repo", "test-token", df, false)
 	require.NoError(t, err)
-	require.Len(t, prs, 1)
+	require.Len(t, result.PRs, 1)
 
-	assert.Equal(t, 1, prs[0].Number)
-	assert.Equal(t, "First PR", prs[0].Title)
-	assert.Equal(t, "alice", prs[0].Author)
-	assert.Equal(t, "closed", prs[0].State)
-	assert.Equal(t, "Description of first PR", prs[0].Body)
-	assert.Contains(t, prs[0].Diff, "diff content for PR")
+	assert.Equal(t, 1, result.PRs[0].Number)
+	assert.Equal(t, "First PR", result.PRs[0].Title)
+	assert.Equal(t, "alice", result.PRs[0].Author)
+	assert.Equal(t, "closed", result.PRs[0].State)
+	assert.Equal(t, "Description of first PR", result.PRs[0].Body)
+	assert.Contains(t, result.PRs[0].Diff, "diff content for PR")
 
-	require.Len(t, prs[0].Reviews, 1)
-	assert.Equal(t, "bob", prs[0].Reviews[0].Author)
-	assert.Equal(t, "APPROVED", prs[0].Reviews[0].State)
-	assert.Equal(t, "LGTM", prs[0].Reviews[0].Body)
+	require.Len(t, result.PRs[0].Reviews, 1)
+	assert.Equal(t, "bob", result.PRs[0].Reviews[0].Author)
+	assert.Equal(t, "APPROVED", result.PRs[0].Reviews[0].State)
+	assert.Equal(t, "LGTM", result.PRs[0].Reviews[0].Body)
 }
 
 func TestFetchGitHubPRs_DateFiltering(t *testing.T) {
@@ -134,10 +134,10 @@ func TestFetchGitHubPRs_DateFiltering(t *testing.T) {
 		To:   timestamppb.New(time.Date(2025, 6, 30, 0, 0, 0, 0, time.UTC)),
 	}.Build()
 
-	prs, err := fetchGitHubPRs(t.Context(), "owner", "repo", "", df, false)
+	result, err := fetchGitHubPRs(t.Context(), "owner", "repo", "", df, false)
 	require.NoError(t, err)
-	require.Len(t, prs, 1)
-	assert.Equal(t, "In range", prs[0].Title)
+	require.Len(t, result.PRs, 1)
+	assert.Equal(t, "In range", result.PRs[0].Title)
 }
 
 func TestFetchGitHubPRs_Pagination(t *testing.T) {
@@ -183,10 +183,10 @@ func TestFetchGitHubPRs_Pagination(t *testing.T) {
 
 	withGitHubServer(t, mux)
 
-	prs, err := fetchGitHubPRs(t.Context(), "owner", "repo", "", nil, false)
+	result, err := fetchGitHubPRs(t.Context(), "owner", "repo", "", nil, false)
 	require.NoError(t, err)
 	assert.Equal(t, 2, callCount)
-	assert.Len(t, prs, 101)
+	assert.Len(t, result.PRs, 101)
 }
 
 func TestFetchGitHubPRs_EmptyToken(t *testing.T) {
@@ -228,9 +228,9 @@ func TestFetchGitHubPRs_EmptyResponse(t *testing.T) {
 
 	withGitHubServer(t, mux)
 
-	prs, err := fetchGitHubPRs(t.Context(), "owner", "repo", "", nil, false)
+	result, err := fetchGitHubPRs(t.Context(), "owner", "repo", "", nil, false)
 	require.NoError(t, err)
-	assert.Empty(t, prs)
+	assert.Empty(t, result.PRs)
 }
 
 func TestFetchGitHubPRs_SummaryOnlySkipsReviewsAndDiff(t *testing.T) {
@@ -302,13 +302,13 @@ func TestFetchGitHubPRs_SummaryOnlySkipsReviewsAndDiff(t *testing.T) {
 		To:   timestamppb.New(time.Date(2025, 6, 30, 0, 0, 0, 0, time.UTC)),
 	}.Build()
 
-	prs, err := fetchGitHubPRs(t.Context(), "owner", "repo", "", df, true)
+	result, err := fetchGitHubPRs(t.Context(), "owner", "repo", "", df, true)
 	require.NoError(t, err)
-	require.Len(t, prs, 1)
-	assert.Equal(t, "PR One", prs[0].Title)
-	assert.Equal(t, "alice@example.com", prs[0].AuthorEmail)
-	assert.Empty(t, prs[0].Reviews)
-	assert.Empty(t, prs[0].Diff)
+	require.Len(t, result.PRs, 1)
+	assert.Equal(t, "PR One", result.PRs[0].Title)
+	assert.Equal(t, "alice@example.com", result.PRs[0].AuthorEmail)
+	assert.Empty(t, result.PRs[0].Reviews)
+	assert.Empty(t, result.PRs[0].Diff)
 	assert.False(t, reviewsCalled, "reviews endpoint should not be called when summaryOnly=true")
 	assert.False(t, diffCalled, "diff endpoint should not be called when summaryOnly=true")
 }

@@ -81,10 +81,10 @@ func TestFetchGitHubPRs_Integration(t *testing.T) {
 		To:   to,
 	}.Build()
 
-	prs, err := fetchGitHubPRs(context.Background(), "opensdd", "osdd-core", token, df, false)
+	result, err := fetchGitHubPRs(context.Background(), "opensdd", "osdd-core", token, df, false)
 	require.NoError(t, err)
-	t.Logf("GitHub PRs found: %d", len(prs))
-	for _, pr := range prs {
+	t.Logf("GitHub PRs found: %d", len(result.PRs))
+	for _, pr := range result.PRs {
 		t.Logf("  PR #%d: %s (%s)", pr.Number, pr.Title, pr.State)
 	}
 }
@@ -103,7 +103,7 @@ func TestFetchBitbucketPRs_Integration(t *testing.T) {
 		To:   to,
 	}.Build()
 
-	prs, err := fetchBitbucketPRs(
+	result, err := fetchBitbucketPRs(
 		context.Background(),
 		env["OSDD_TEST_BITBUCKET_WORKSPACE"],
 		env["OSDD_TEST_BITBUCKET_REPO"],
@@ -112,8 +112,8 @@ func TestFetchBitbucketPRs_Integration(t *testing.T) {
 		false,
 	)
 	require.NoError(t, err)
-	t.Logf("Bitbucket PRs found: %d", len(prs))
-	for _, pr := range prs {
+	t.Logf("Bitbucket PRs found: %d", len(result.PRs))
+	for _, pr := range result.PRs {
 		t.Logf("  PR #%d: %s (%s)", pr.Number, pr.Title, pr.State)
 	}
 }

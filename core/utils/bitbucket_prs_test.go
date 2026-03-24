@@ -76,20 +76,20 @@ func TestFetchBitbucketPRs_Success(t *testing.T) {
 		To:   timestamppb.New(time.Date(2025, 6, 30, 0, 0, 0, 0, time.UTC)),
 	}.Build()
 
-	prs, err := fetchBitbucketPRs(t.Context(), "ws", "repo", "test-token", df, false)
+	result, err := fetchBitbucketPRs(t.Context(), "ws", "repo", "test-token", df, false)
 	require.NoError(t, err)
-	require.Len(t, prs, 1)
+	require.Len(t, result.PRs, 1)
 
-	assert.Equal(t, 1, prs[0].Number)
-	assert.Equal(t, "BB PR One", prs[0].Title)
-	assert.Equal(t, "Alice", prs[0].Author)
-	assert.Equal(t, "merged", prs[0].State)
-	assert.Equal(t, "First BB PR", prs[0].Body)
-	assert.Contains(t, prs[0].Diff, "+added line")
+	assert.Equal(t, 1, result.PRs[0].Number)
+	assert.Equal(t, "BB PR One", result.PRs[0].Title)
+	assert.Equal(t, "Alice", result.PRs[0].Author)
+	assert.Equal(t, "merged", result.PRs[0].State)
+	assert.Equal(t, "First BB PR", result.PRs[0].Body)
+	assert.Contains(t, result.PRs[0].Diff, "+added line")
 
-	require.Len(t, prs[0].Reviews, 1)
-	assert.Equal(t, "Bob", prs[0].Reviews[0].Author)
-	assert.Equal(t, "Nice work!", prs[0].Reviews[0].Body)
+	require.Len(t, result.PRs[0].Reviews, 1)
+	assert.Equal(t, "Bob", result.PRs[0].Reviews[0].Author)
+	assert.Equal(t, "Nice work!", result.PRs[0].Reviews[0].Body)
 }
 
 func TestFetchBitbucketPRs_DateFiltering(t *testing.T) {
@@ -143,10 +143,10 @@ func TestFetchBitbucketPRs_DateFiltering(t *testing.T) {
 		To:   timestamppb.New(time.Date(2025, 6, 30, 0, 0, 0, 0, time.UTC)),
 	}.Build()
 
-	prs, err := fetchBitbucketPRs(t.Context(), "ws", "repo", "", df, false)
+	result, err := fetchBitbucketPRs(t.Context(), "ws", "repo", "", df, false)
 	require.NoError(t, err)
-	require.Len(t, prs, 1)
-	assert.Equal(t, "In range", prs[0].Title)
+	require.Len(t, result.PRs, 1)
+	assert.Equal(t, "In range", result.PRs[0].Title)
 }
 
 func TestFetchBitbucketPRs_Pagination(t *testing.T) {
@@ -193,10 +193,10 @@ func TestFetchBitbucketPRs_Pagination(t *testing.T) {
 
 	serverURL = withBitbucketServer(t, mux)
 
-	prs, err := fetchBitbucketPRs(t.Context(), "ws", "repo", "", nil, false)
+	result, err := fetchBitbucketPRs(t.Context(), "ws", "repo", "", nil, false)
 	require.NoError(t, err)
 	assert.Equal(t, 2, callCount)
-	assert.Len(t, prs, 2)
+	assert.Len(t, result.PRs, 2)
 }
 
 func TestFetchBitbucketPRs_HTTPError(t *testing.T) {

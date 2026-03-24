@@ -36,11 +36,12 @@ type GitHistoryFile struct {
 
 // parsedCommit holds a single parsed commit from git log output.
 type parsedCommit struct {
-	Hash    string
-	Author  string
-	Date    string
-	Message string
-	Diff    string
+	Hash        string
+	Author      string
+	Date        string
+	Message     string
+	Diff        string
+	GitHubLogin string
 }
 
 // formattedItem is a piece of formatted markdown ready for splitting.
@@ -83,8 +84,8 @@ func FetchGitHistory(ctx context.Context, src *recipes.GitHistorySource, token s
 		err     error
 	}
 	type prResult struct {
-		prs []pullRequest
-		err error
+		result prFetchResult
+		err    error
 	}
 
 	commitCh := make(chan commitResult, 1)
@@ -129,14 +130,14 @@ func FetchGitHistory(ctx context.Context, src *recipes.GitHistorySource, token s
 		if src.HasDateFilter() {
 			dateFilter = src.GetDateFilter()
 		}
-		prs, err := fetchPRs(ctx, provider, fullName, token, dateFilter, summaryOnly)
+		fetched, err := fetchPRs(ctx, provider, fullName, token, dateFilter, summaryOnly)
 		if err != nil {
 			slog.Warn("Failed to fetch PRs, continuing with commits only", "error", err)
 			prCh <- prResult{}
 			return
 		}
-		slog.Debug("Fetched PRs", "count", len(prs))
-		prCh <- prResult{prs: prs}
+		slog.Debug("Fetched PRs", "count", len(fetched.PRs))
+		prCh <- prResult{result: fetched}
 	}()
 
 	// Collect results.
@@ -147,7 +148,22 @@ func FetchGitHistory(ctx context.Context, src *recipes.GitHistorySource, token s
 	commits := cr.commits
 
 	pr := <-prCh
-	prs := pr.prs
+	prs := pr.result.PRs
+
+	// Enrich commits with GitHub login via reverse email→login map from PRs.
+	if loginEmails := pr.result.LoginEmails; len(loginEmails) > 0 {
+		reverseMap := make(map[string]string, len(loginEmails))
+		for login, email := range loginEmails {
+			reverseMap[email] = login
+		}
+		for i := range commits {
+			if email := parseEmailFromAuthor(commits[i].Author); email != "" {
+				if login, ok := reverseMap[email]; ok {
+					commits[i].GitHubLogin = login
+				}
+			}
+		}
+	}
 
 	// Commits: batched by token limit.
 	var files []GitHistoryFile
@@ -268,10 +284,10 @@ func parseOneCommit(raw string) parsedCommit {
 	return c
 }
 
-func fetchPRs(ctx context.Context, provider, fullName, token string, dateFilter *osdd.DatesFilter, summaryOnly bool) ([]pullRequest, error) {
+func fetchPRs(ctx context.Context, provider, fullName, token string, dateFilter *osdd.DatesFilter, summaryOnly bool) (prFetchResult, error) {
 	parts := strings.SplitN(fullName, "/", 2)
 	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid full_name %q: expected owner/repo", fullName)
+		return prFetchResult{}, fmt.Errorf("invalid full_name %q: expected owner/repo", fullName)
 	}
 	owner, repo := parts[0], parts[1]
 
@@ -281,7 +297,7 @@ func fetchPRs(ctx context.Context, provider, fullName, token string, dateFilter 
 	case "bitbucket":
 		return fetchBitbucketPRs(ctx, owner, repo, token, dateFilter, summaryOnly)
 	default:
-		return nil, fmt.Errorf("unsupported provider for PR fetching: %s", provider)
+		return prFetchResult{}, fmt.Errorf("unsupported provider for PR fetching: %s", provider)
 	}
 }
 
@@ -289,6 +305,9 @@ var commitTmpl = template.Must(template.New("commit").Parse(
 	`## Commit {{.Hash}}
 
 **Author:** {{.Author}}
+{{- if .GitHubLogin}}
+**GitHub:** {{.GitHubLogin}}
+{{- end}}
 **Date:** {{.Date}}
 {{if .Message}}
 ### Message
@@ -438,6 +457,16 @@ func splitByTokenLimit(items []formattedItem, maxTokens int, prefix string) []Gi
 	}
 
 	return files
+}
+
+// parseEmailFromAuthor extracts the email from a git author string like "Name <email>".
+func parseEmailFromAuthor(author string) string {
+	start := strings.LastIndex(author, "<")
+	end := strings.LastIndex(author, ">")
+	if start >= 0 && end > start+1 {
+		return author[start+1 : end]
+	}
+	return ""
 }
 
 func formatTimeIfSet(t time.Time) string {

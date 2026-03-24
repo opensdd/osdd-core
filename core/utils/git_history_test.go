@@ -171,6 +171,63 @@ func TestFormatCommit(t *testing.T) {
 	assert.Contains(t, items[0].Content, "+func Fix() {}")
 }
 
+func TestFormatCommit_WithGitHubLogin(t *testing.T) {
+	t.Parallel()
+
+	commits := []parsedCommit{
+		{
+			Hash:        "abc123",
+			Author:      "Alice <alice@example.com>",
+			Date:        "2025-06-15T10:00:00+00:00",
+			Message:     "Fix the widget",
+			GitHubLogin: "alice-gh",
+		},
+	}
+
+	items := formatCommits(commits, false)
+	require.Len(t, items, 1)
+	assert.Contains(t, items[0].Content, "**GitHub:** alice-gh")
+}
+
+func TestFormatCommit_WithoutGitHubLogin(t *testing.T) {
+	t.Parallel()
+
+	commits := []parsedCommit{
+		{
+			Hash:    "abc123",
+			Author:  "Alice <alice@example.com>",
+			Date:    "2025-06-15T10:00:00+00:00",
+			Message: "Fix the widget",
+		},
+	}
+
+	items := formatCommits(commits, false)
+	require.Len(t, items, 1)
+	assert.NotContains(t, items[0].Content, "**GitHub:**")
+}
+
+func TestParseEmailFromAuthor(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		author string
+		want   string
+	}{
+		{"standard format", "Alice <alice@example.com>", "alice@example.com"},
+		{"no email", "Alice", ""},
+		{"empty", "", ""},
+		{"just brackets", "Alice <>", ""},
+		{"with display name parts", "Alice Smith <alice.smith@example.com>", "alice.smith@example.com"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, parseEmailFromAuthor(tt.author))
+		})
+	}
+}
+
 func TestFormatOnePR(t *testing.T) {
 	t.Parallel()
 

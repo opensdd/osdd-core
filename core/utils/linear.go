@@ -38,6 +38,13 @@ const linearQuery = `query($filter: IssueFilter, $after: String) {
       canceledAt
       priority
       priorityLabel
+      comments(first: 20) {
+        nodes {
+          body
+          user { name email }
+          createdAt
+        }
+      }
     }
     pageInfo {
       hasNextPage
@@ -80,8 +87,9 @@ type linearIssue struct {
 	UpdatedAt     string            `json:"updatedAt"`
 	CompletedAt   string            `json:"completedAt"`
 	CanceledAt    string            `json:"canceledAt"`
-	Priority      int               `json:"priority"`
-	PriorityLabel string            `json:"priorityLabel"`
+	Priority      int                 `json:"priority"`
+	PriorityLabel string              `json:"priorityLabel"`
+	Comments      *linearCommentNodes `json:"comments"`
 }
 
 type linearTeam struct {
@@ -105,6 +113,16 @@ type linearName struct {
 type linearUser struct {
 	Name  string `json:"name"`
 	Email string `json:"email,omitempty"`
+}
+
+type linearCommentNode struct {
+	Body      string      `json:"body"`
+	User      *linearUser `json:"user"`
+	CreatedAt string      `json:"createdAt"`
+}
+
+type linearCommentNodes struct {
+	Nodes []linearCommentNode `json:"nodes"`
 }
 
 type linearPageInfo struct {

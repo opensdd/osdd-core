@@ -41,22 +41,36 @@ type jiraIssue struct {
 }
 
 type jiraIssueFields struct {
-	Summary        string          `json:"summary"`
-	Description    json.RawMessage `json:"description"`
-	Status         jiraName        `json:"status"`
-	Resolution     *jiraName       `json:"resolution"`
-	Assignee       *jiraUser       `json:"assignee"`
-	Reporter       *jiraUser       `json:"reporter"`
-	Creator        *jiraUser       `json:"creator"`
-	IssueType      jiraName        `json:"issuetype"`
-	Priority       jiraName        `json:"priority"`
-	Labels         []string        `json:"labels"`
-	Components     []jiraName      `json:"components"`
-	FixVersions    []jiraName      `json:"fixVersions"`
-	Created        string          `json:"created"`
-	Updated        string          `json:"updated"`
-	ResolutionDate string          `json:"resolutiondate"`
-	Parent         *jiraParent     `json:"parent"`
+	Summary        string                `json:"summary"`
+	Description    json.RawMessage       `json:"description"`
+	Status         jiraName              `json:"status"`
+	Resolution     *jiraName             `json:"resolution"`
+	Assignee       *jiraUser             `json:"assignee"`
+	Reporter       *jiraUser             `json:"reporter"`
+	Creator        *jiraUser             `json:"creator"`
+	IssueType      jiraName              `json:"issuetype"`
+	Priority       jiraName              `json:"priority"`
+	Labels         []string              `json:"labels"`
+	Components     []jiraName            `json:"components"`
+	FixVersions    []jiraName            `json:"fixVersions"`
+	Created        string                `json:"created"`
+	Updated        string                `json:"updated"`
+	ResolutionDate string                `json:"resolutiondate"`
+	Parent         *jiraParent           `json:"parent"`
+	Comment        *jiraCommentContainer `json:"comment"`
+}
+
+type jiraCommentContainer struct {
+	Comments []jiraComment `json:"comments"`
+	Total    int           `json:"total"`
+}
+
+type jiraComment struct {
+	ID      string          `json:"id"`
+	Author  *jiraUser       `json:"author"`
+	Body    json.RawMessage `json:"body"`
+	Created string          `json:"created"`
+	Updated string          `json:"updated"`
 }
 
 type jiraParent struct {
@@ -107,7 +121,7 @@ func FetchJiraIssues(ctx context.Context, src *recipes.JiraIssuesSource, token s
 		reqBody := jiraSearchRequest{
 			JQL:           jql,
 			MaxResults:    jiraMaxResults,
-			Fields:        []string{"summary", "description", "status", "resolution", "assignee", "reporter", "creator", "created", "updated", "resolutiondate", "issuetype", "priority", "labels", "components", "fixVersions", "parent"},
+			Fields:        []string{"summary", "description", "status", "resolution", "assignee", "reporter", "creator", "created", "updated", "resolutiondate", "issuetype", "priority", "labels", "components", "fixVersions", "parent", "comment"},
 			NextPageToken: nextPageToken,
 		}
 

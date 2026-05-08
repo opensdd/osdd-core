@@ -38,7 +38,7 @@ const linearQuery = `query($filter: IssueFilter, $after: String) {
       canceledAt
       priority
       priorityLabel
-      comments(first: 20) {
+      comments {
         nodes {
           body
           user { name email }

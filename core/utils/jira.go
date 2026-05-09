@@ -21,6 +21,14 @@ var jiraBaseURL string
 const jiraMaxResults = 50
 const jiraMaxIssues = 1000
 
+// jiraBulkEmailResponse is the response from GET /rest/api/3/user/email/bulk.
+type jiraBulkEmailResponse struct {
+	Values []struct {
+		AccountID string `json:"accountId"`
+		Email     string `json:"email"`
+	} `json:"values"`
+}
+
 // jiraSearchRequest is the POST body for the Jira search/jql endpoint.
 type jiraSearchRequest struct {
 	JQL           string   `json:"jql"`
@@ -178,6 +186,13 @@ func FetchJiraIssues(ctx context.Context, src *recipes.JiraIssuesSource, token s
 
 	slog.Debug("Jira issues fetched", "count", len(allIssues))
 
+	// Enrich users with emails via the bulk email API (bypasses profile visibility).
+	if emails, err := fetchJiraEmailsBulk(ctx, baseURL, token, allIssues); err != nil {
+		slog.Warn("Failed to fetch Jira bulk emails, proceeding without emails", "err", err)
+	} else {
+		enrichJiraIssuesWithEmails(allIssues, emails)
+	}
+
 	result := &IssuesResult{
 		Summary: make([]IssueSummary, 0, len(allIssues)),
 		Issues:  make(map[string]string, len(allIssues)),
@@ -242,4 +257,116 @@ func formatTimestampForJQL(ts *timestamppb.Timestamp) string {
 		return ""
 	}
 	return ts.AsTime().UTC().Format("2006-01-02")
+}
+
+const jiraBulkEmailBatchSize = 100
+
+// fetchJiraEmailsBulk calls GET /rest/api/3/user/email/bulk and returns a map
+// of accountId → email. Works with Forge system tokens and bypasses Jira profile
+// visibility settings. Batches requests at 100 accountIds each.
+func fetchJiraEmailsBulk(ctx context.Context, baseURL, token string, issues []jiraIssue) (map[string]string, error) {
+	seen := make(map[string]struct{})
+	for i := range issues {
+		f := &issues[i].Fields
+		for _, u := range []*jiraUser{f.Assignee, f.Reporter, f.Creator} {
+			if u != nil && u.AccountID != "" {
+				seen[u.AccountID] = struct{}{}
+			}
+		}
+		if f.Comment != nil {
+			for j := range f.Comment.Comments {
+				if a := f.Comment.Comments[j].Author; a != nil && a.AccountID != "" {
+					seen[a.AccountID] = struct{}{}
+				}
+			}
+		}
+	}
+
+	if len(seen) == 0 {
+		return nil, nil
+	}
+
+	accountIDs := make([]string, 0, len(seen))
+	for id := range seen {
+		accountIDs = append(accountIDs, id)
+	}
+
+	emails := make(map[string]string, len(accountIDs))
+	for start := 0; start < len(accountIDs); start += jiraBulkEmailBatchSize {
+		end := start + jiraBulkEmailBatchSize
+		if end > len(accountIDs) {
+			end = len(accountIDs)
+		}
+		batch := accountIDs[start:end]
+
+		params := make([]string, len(batch))
+		for i, id := range batch {
+			params[i] = "accountId=" + id
+		}
+		url := baseURL + "/rest/api/3/user/email/bulk?" + strings.Join(params, "&")
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create bulk email request: %w", err)
+		}
+		req.Header.Set("Accept", "application/json")
+		if token != "" {
+			if strings.Contains(token, ":") {
+				req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(token)))
+			} else {
+				req.Header.Set("Authorization", "Bearer "+token)
+			}
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("failed to call bulk email API: %w", err)
+		}
+		respBody, err := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if err != nil {
+			return nil, fmt.Errorf("failed to read bulk email response: %w", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("bulk email API returned status %d: %s", resp.StatusCode, string(respBody))
+		}
+
+		var bulkResp jiraBulkEmailResponse
+		if err := json.Unmarshal(respBody, &bulkResp); err != nil {
+			return nil, fmt.Errorf("failed to parse bulk email response: %w", err)
+		}
+		for _, v := range bulkResp.Values {
+			if v.Email != "" {
+				emails[v.AccountID] = v.Email
+			}
+		}
+	}
+
+	return emails, nil
+}
+
+// enrichJiraIssuesWithEmails sets EmailAddress on all jiraUser fields using the
+// accountId → email map returned by fetchJiraEmailsBulk.
+func enrichJiraIssuesWithEmails(issues []jiraIssue, emails map[string]string) {
+	if len(emails) == 0 {
+		return
+	}
+	setEmail := func(u *jiraUser) {
+		if u != nil && u.EmailAddress == "" {
+			if e, ok := emails[u.AccountID]; ok {
+				u.EmailAddress = e
+			}
+		}
+	}
+	for i := range issues {
+		f := &issues[i].Fields
+		setEmail(f.Assignee)
+		setEmail(f.Reporter)
+		setEmail(f.Creator)
+		if f.Comment != nil {
+			for j := range f.Comment.Comments {
+				setEmail(f.Comment.Comments[j].Author)
+			}
+		}
+	}
 }
